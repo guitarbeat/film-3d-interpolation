@@ -36,3 +36,38 @@ This repository aims to extend the Frame Interpolation for Large Motion (FILM) m
 
 Further details on setup and usage will be provided as the project progresses.
 
+
+
+## Usage
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/guitarbeat/film-3d-interpolation.git
+    cd film-3d-interpolation
+    ```
+
+2.  **Install dependencies:**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Run the Maximum Intensity Projection (MIP) example:**
+
+    This script demonstrates how to use the `Interpolator3D` class to interpolate between two dummy 3D volumes and then perform a Maximum Intensity Projection (MIP) on the interpolated volume.
+
+    ```bash
+    python3 run_mip_example.py
+    ```
+
+    This will generate an `interpolated_mip.png` file in the repository root, showing the 2D MIP of the interpolated 3D data.
+
+## Code Structure
+
+*   `film_3d.py`: Contains the `Interpolator3D` class, which adapts the FILM model for 3D data by processing slices, and the `max_intensity_projection` function.
+*   `run_mip_example.py`: A script to demonstrate the usage of `film_3d.py` with dummy 3D data and visualize the MIP.
+*   `requirements.txt`: Lists the Python dependencies required to run the project.
+*   `test_film_3d.py`: Unit tests for `load_volume` and `max_intensity_projection` functions.
+
+

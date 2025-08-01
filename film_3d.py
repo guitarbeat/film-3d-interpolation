@@ -4,51 +4,70 @@ import tensorflow_hub as hub
 import numpy as np
 from typing import Generator, Iterable, List, Optional
 
-# Assuming mediapy is not directly available or needed for core 3D logic
-# import mediapy as media
+# This module provides functionalities for 3D frame interpolation using a modified FILM model
+# and for performing Maximum Intensity Projection (MIP) on 3D volumetric data.
 
 _UINT8_MAX_F = float(np.iinfo(np.uint8).max)
 
-def load_volume(vol_path: str):
-  """Loads a 3D volume (e.g., a stack of images) and normalizes it.
-  Returns a volume with shape [depth, height, width, num_channels], with pixels in [0..1] range, and type np.float32.
+def load_volume(vol_path: str) -> np.ndarray:
+  """Loads a 3D volume from a specified path and normalizes its pixel values.
+
+  This function currently serves as a placeholder. In a real-world application,
+  it would handle various 3D image formats (e.g., DICOM, TIFF stacks, NIfTI).
+  For demonstration purposes, it generates a dummy 3D volume.
+
+  Args:
+    vol_path: The file path to the 3D volume. (Currently unused for dummy data generation).
+
+  Returns:
+    A NumPy array representing the 3D volume with shape
+    [depth, height, width, num_channels], where pixel values are normalized
+    to the range [0, 1] and data type is np.float32.
   """
-  # This is a placeholder. Actual implementation would depend on volume format (e.g., DICOM, TIFF stack)
-  # For now, let's assume a simple numpy array loading for demonstration.
-  # In a real scenario, you'd load a 3D image format.
-  print(f"Placeholder: Loading volume from {vol_path}")
+  print(f"Placeholder: Simulating loading volume from {vol_path}")
   # Simulate loading a 3D volume (e.g., 10 slices of 128x128 grayscale images)
+  # The last dimension (channels) is 1 for grayscale.
   dummy_volume = np.random.rand(10, 128, 128, 1).astype(np.float32)
   return dummy_volume
 
-def _pad_to_align(x, align):
-  """Pads image batch x so width and height divide by align.
+def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, dict]:
+  """Pads an image batch or 3D volume so its height and width are divisible by 'align'.
+
+  This padding is necessary for models that require input dimensions to be
+  multiples of a certain value (e.g., due to pooling layers).
+  For 3D volumes, padding is applied independently to each 2D slice.
 
   Args:
-    x: Image batch to align.
-    align: Number to align to.
+    x: The input image batch (4D: [batch, height, width, channels]) or
+       3D volume (5D: [batch, depth, height, width, channels]) to be padded.
+    align: The integer value to which height and width should be aligned.
 
   Returns:
-    1) An image padded so width % align == 0 and height % align == 0.
-    2) A bounding box that can be fed readily to tf.image.crop_to_bounding_box
-      to undo the padding.
+    A tuple containing:
+    - padded_x: The padded image batch or 3D volume as a TensorFlow Tensor.
+    - bbox_to_crop: A dictionary containing bounding box information
+                    (offset_height, offset_width, target_height, target_width)
+                    that can be used with `tf.image.crop_to_bounding_box`
+                    to revert the padding.
   """
-  # Input checking.
-  assert np.ndim(x) == 4 or np.ndim(x) == 5 # Added 5 for 3D volumes (batch, depth, height, width, channels)
-  assert align > 0, 'align must be a positive number.'
+  # Input validation: ensure the input array has 4 or 5 dimensions.
+  assert np.ndim(x) == 4 or np.ndim(x) == 5, \
+      "Input must be 4D (batch, H, W, C) or 5D (batch, D, H, W, C)"
+  assert align > 0, "Alignment value must be a positive number."
 
-  # For 3D, we might need to align depth as well, or handle it differently.
-  # For now, let's assume alignment only on height and width for simplicity,
-  # as the FILM model is 2D based.
+  # Determine dimensions based on whether it's a 4D image batch or 5D volume.
   if np.ndim(x) == 5:
       batch_size, depth, height, width, channels = x.shape
   else:
+      # If 4D, treat as a single-slice 3D volume for consistent processing.
       batch_size, height, width, channels = x.shape
-      depth = 1 # Treat 2D as 1-slice 3D for consistent processing
+      depth = 1
 
+  # Calculate padding needed for height and width.
   height_to_pad = (align - height % align) if height % align != 0 else 0
   width_to_pad = (align - width % align) if width % align != 0 else 0
 
+  # Define the bounding box for padding.
   bbox_to_pad = {
       'offset_height': height_to_pad // 2,
       'offset_width': width_to_pad // 2,
@@ -56,19 +75,23 @@ def _pad_to_align(x, align):
       'target_width': width + width_to_pad
   }
 
-  # Pad each slice independently if it's a 3D volume
+  # Apply padding to each 2D slice of the volume independently.
   padded_x_slices = []
   for d in range(depth):
       if np.ndim(x) == 5:
+          # Extract a 2D slice from the 5D volume and pad it.
           padded_x_slices.append(tf.image.pad_to_bounding_box(x[:, d, :, :, :], **bbox_to_pad))
       else:
+          # If 4D, pad the entire image batch.
           padded_x_slices.append(tf.image.pad_to_bounding_box(x, **bbox_to_pad))
 
+  # Stack the padded slices back into the original dimension format.
   if np.ndim(x) == 5:
-      padded_x = tf.stack(padded_x_slices, axis=1) # Stack back into 5D
+      padded_x = tf.stack(padded_x_slices, axis=1) # Stack back into 5D volume.
   else:
-      padded_x = padded_x_slices[0] # Still 4D
+      padded_x = padded_x_slices[0] # Remains 4D image batch.
 
+  # Define the bounding box for cropping back to original dimensions after inference.
   bbox_to_crop = {
       'offset_height': height_to_pad // 2,
       'offset_width': width_to_pad // 2,
@@ -81,41 +104,57 @@ def _pad_to_align(x, align):
 class Interpolator3D:
   """A class for generating interpolated frames between two input 3D volumes.
 
-  Adapts the Film model from TFHub for 3D data by processing slices.
+  This class adapts the 2D FILM (Frame Interpolation for Large Motion) model
+  from TensorFlow Hub to work with 3D volumetric data. It processes each 2D
+  slice of the 3D volumes independently using the underlying 2D FILM model
+  and then reconstructs the interpolated 3D volume.
   """
 
   def __init__(self, align: int = 64) -> None:
-    """Loads a saved model.
+    """Initializes the Interpolator3D by loading the FILM model.
 
     Args:
-      align: 'If >1, pad the input size so it divides with this before
-        inference.'
+      align: If greater than 1, input dimensions (height and width) will be
+             padded to be divisible by this value before inference. This is
+             a common requirement for deep learning models.
     """
+    # Load the pre-trained 2D FILM model from TensorFlow Hub.
     self._model = hub.load("https://tfhub.dev/google/film/1")
     self._align = align
 
-  def __call__(self, x0: np.ndarray, x1: np.ndarray,
-               dt: np.ndarray) -> np.ndarray:
-    """Generates an interpolated 3D volume between given two batches of 3D volumes.
+  def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    """Generates an interpolated 3D volume between two given 3D volumes.
 
-    All inputs should be np.float32 datatype.
-    x0, x1 are expected to be 5D: (batch_size, depth, height, width, channels)
-    dt is expected to be 1D: (batch_size,)
+    The interpolation is performed slice by slice using the 2D FILM model.
+
+    Args:
+      x0: The first input 3D volume. Expected shape:
+          (batch_size, depth, height, width, channels). Data type must be np.float32.
+      x1: The second input 3D volume. Expected shape:
+          (batch_size, depth, height, width, channels). Data type must be np.float32.
+      dt: The sub-frame time, indicating the position of the generated frame
+          between x0 and x1. Expected shape: (batch_size,). Values should be
+          in the range [0, 1], where 0.5 represents the midway point.
 
     Returns:
-      The result with dimensions (batch_size, depth, height, width, channels).
+      The interpolated 3D volume as a NumPy array with the same dimensions as
+      the input volumes: (batch_size, depth, height, width, channels).
     """
-    assert np.ndim(x0) == 5 and np.ndim(x1) == 5, "Input volumes must be 5D (batch, depth, height, width, channels)"
-    assert x0.shape[1] == x1.shape[1], "Input volumes must have the same depth"
+    # Input validation for 3D volumes.
+    assert np.ndim(x0) == 5 and np.ndim(x1) == 5, \
+        "Input volumes must be 5D (batch, depth, height, width, channels)"
+    assert x0.shape[1] == x1.shape[1], "Input volumes must have the same depth dimension."
 
     batch_size, depth, height, width, channels = x0.shape
     interpolated_slices = []
 
+    # Iterate through each depth slice and perform 2D interpolation.
     for d in range(depth):
-        # Extract 2D slices for interpolation
+        # Extract 2D slices from the 3D volumes.
         slice0 = x0[:, d, :, :, :]
         slice1 = x1[:, d, :, :, :]
 
+        # Apply padding if alignment is required.
         if self._align is not None:
             slice0_padded, bbox_to_crop = _pad_to_align(slice0, self._align)
             slice1_padded, _ = _pad_to_align(slice1, self._align)
@@ -123,31 +162,52 @@ class Interpolator3D:
             slice0_padded = slice0
             slice1_padded = slice1
 
+        # Convert 1-channel (grayscale) input to 3-channel (RGB) by repeating
+        # the channel, as the FILM model expects 3-channel input.
+        if slice0_padded.shape[-1] == 1:
+            slice0_padded = np.repeat(slice0_padded, 3, axis=-1)
+            slice1_padded = np.repeat(slice1_padded, 3, axis=-1)
+
+        # Prepare inputs for the 2D FILM model.
         inputs = {
             'x0': slice0_padded,
             'x1': slice1_padded,
-            'time': dt[..., np.newaxis] # Ensure dt has batch dim and is 2D for model
+            'time': dt[..., np.newaxis] # Add a new axis to dt for batch dimension consistency.
         }
+        # Perform inference using the 2D FILM model.
         result = self._model(inputs, training=False)
         image_slice = result['image']
 
+        # Crop the interpolated slice back to its original dimensions if padding was applied.
         if self._align is not None:
             image_slice = tf.image.crop_to_bounding_box(image_slice, **bbox_to_crop)
-        interpolated_slices.append(image_slice.numpy()) # Convert to numpy immediately
+        # Convert the TensorFlow Tensor result to a NumPy array and store it.
+        interpolated_slices.append(image_slice.numpy())
 
-    # Stack the interpolated slices back into a 5D volume
+    # Stack all interpolated 2D slices back together to form the 5D interpolated volume.
     interpolated_volume = np.stack(interpolated_slices, axis=1)
     return interpolated_volume
 
 def max_intensity_projection(volume: np.ndarray, axis: int = 1) -> np.ndarray:
-    """Performs Maximum Intensity Projection (MIP) along a specified axis.
+    """Performs Maximum Intensity Projection (MIP) along a specified axis of a 3D volume.
+
+    MIP is a method for 3D visualization that projects the voxels with the
+    highest intensity onto a 2D plane. This is particularly useful for
+    visualizing structures like 
+
+
+3D sticks in time, as it highlights the brightest parts of the data.
 
     Args:
-        volume: Input 3D volume (batch, depth, height, width, channels).
-        axis: The axis along which to perform the MIP. 1 for depth (Z-axis).
+        volume: The input 3D volume as a NumPy array. Expected shape:
+                (batch_size, depth, height, width, channels).
+        axis: The axis along which to perform the MIP. For a 5D volume,
+              axis=1 typically corresponds to the depth (Z-axis) dimension.
 
     Returns:
-        A 2D projection of the volume.
+        A 2D projection of the volume as a NumPy array, with the specified
+        axis collapsed. The shape will be (batch_size, height, width, channels)
+        if MIP is performed along the depth axis.
     """
     assert np.ndim(volume) == 5, "Input volume must be 5D for MIP (batch, depth, height, width, channels)"
     return np.max(volume, axis=axis)
@@ -155,31 +215,35 @@ def max_intensity_projection(volume: np.ndarray, axis: int = 1) -> np.ndarray:
 
 if __name__ == '__main__':
     # Example Usage:
+    # This block demonstrates how to use the Interpolator3D and
+    # max_intensity_projection functions.
+
     interpolator_3d = Interpolator3D()
 
-    # Simulate two 3D volumes (e.g., 2 time points of 3D data)
+    # Simulate two 3D volumes (e.g., 2 time points of 3D data).
     # Shape: (batch_size, depth, height, width, channels)
     volume1 = load_volume("volume_t0.tif")
     volume2 = load_volume("volume_t1.tif")
 
-    # Add batch dimension
+    # Add batch dimension to the simulated volumes.
     volume1 = np.expand_dims(volume1, axis=0)
     volume2 = np.expand_dims(volume2, axis=0)
 
-    # Interpolate at midway
+    # Define the interpolation time. 0.5 means midway between volume1 and volume2.
     dt = np.array([0.5], dtype=np.float32)
 
     print("Interpolating 3D volumes...")
+    # Perform 3D interpolation.
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
     print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
 
-    # Perform Maximum Intensity Projection on the interpolated volume
+    # Perform Maximum Intensity Projection on the interpolated volume along the depth axis.
     print("Performing Maximum Intensity Projection...")
     mip_image = max_intensity_projection(interpolated_volume, axis=1) # MIP along depth axis
     print("MIP image shape:", mip_image.shape)
 
-    # You would typically save or display mip_image here
-    # For example, using matplotlib or PIL
+    # In a typical application, you would save or display the mip_image here.
+    # For example, using matplotlib or PIL to visualize the 2D projection.
     # import matplotlib.pyplot as plt
     # plt.imshow(mip_image[0, :, :, 0]) # Assuming batch size 1 and 1 channel
     # plt.title("Maximum Intensity Projection of Interpolated Volume")

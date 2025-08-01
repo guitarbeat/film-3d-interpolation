@@ -32,12 +32,6 @@ This repository aims to extend the Frame Interpolation for Large Motion (FILM) m
 *   Apply the developed model to interpolate 3D stick data over time.
 *   Visualize the interpolated 3D sticks using MIP.
 
-## Getting Started
-
-Further details on setup and usage will be provided as the project progresses.
-
-
-
 ## Usage
 
 1.  **Clone the repository:**
@@ -65,9 +59,9 @@ Further details on setup and usage will be provided as the project progresses.
 
 ## Code Structure
 
-*   `film_3d.py`: Contains the `Interpolator3D` class, which adapts the FILM model for 3D data by processing slices, and the `max_intensity_projection` function.
-*   `run_mip_example.py`: A script to demonstrate the usage of `film_3d.py` with dummy 3D data and visualize the MIP.
+*   `film_3d.py`: Contains the `Interpolator3D` class, which adapts the FILM model for 3D data by processing slices, and the `max_intensity_projection` function. This file now includes comprehensive docstrings and comments for better understanding.
+*   `run_mip_example.py`: A script to demonstrate the usage of `film_3d.py` with dummy 3D data and visualize the MIP. This file also has improved documentation.
 *   `requirements.txt`: Lists the Python dependencies required to run the project.
-*   `test_film_3d.py`: Unit tests for `load_volume` and `max_intensity_projection` functions.
+*   `test_film_3d.py`: Unit tests for `load_volume` and `max_intensity_projection` functions, with added docstrings and comments.
 
 

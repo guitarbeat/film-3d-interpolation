@@ -1,7 +1,7 @@
-
 import unittest
 import numpy as np
 from film_3d import Interpolator3D, max_intensity_projection, load_volume
+
 
 class TestFilm3D(unittest.TestCase):
     """Unit tests for the film_3d module.
@@ -47,9 +47,9 @@ class TestFilm3D(unittest.TestCase):
         # Test case 2: More complex 3D array with varying max values
         complex_volume = np.zeros((1, 3, 5, 5, 1), dtype=np.float32)
         # Set specific voxels to be the maximum in their respective (x,y) positions.
-        complex_volume[0, 0, 2, 2, 0] = 10 # Max in first slice at (2,2)
-        complex_volume[0, 1, 1, 1, 0] = 20 # Max in second slice at (1,1)
-        complex_volume[0, 2, 3, 3, 0] = 5  # Max in third slice at (3,3)
+        complex_volume[0, 0, 2, 2, 0] = 10  # Max in first slice at (2,2)
+        complex_volume[0, 1, 1, 1, 0] = 20  # Max in second slice at (1,1)
+        complex_volume[0, 2, 3, 3, 0] = 5   # Max in third slice at (3,3)
 
         mip_complex = max_intensity_projection(complex_volume, axis=1)
         expected_complex_mip = np.zeros((1, 5, 5, 1), dtype=np.float32)
@@ -59,7 +59,6 @@ class TestFilm3D(unittest.TestCase):
 
         np.testing.assert_array_equal(mip_complex, expected_complex_mip)
 
+
 if __name__ == '__main__':
     unittest.main()
-
-

@@ -49,7 +49,7 @@ We generate 3D volumes containing linear high-intensity structures (“sticks”
 #### 5.3 Qualitative results
 The produced MIP highlights the brightest voxels in the interpolated volume, qualitatively showing coherent structures derived from the endpoints.
 
-![Interpolated MIP](interpolated_mip.png)
+![Interpolated MIP](../examples/outputs/interpolated_mip.png)
 
 ### 6. Validation
 Unit tests in `test_film_3d.py` validate:
@@ -86,12 +86,12 @@ pip install -r requirements.txt
 
 #### Run demo
 ```bash
-python3 run_mip_example.py
+PYTHONPATH=src python3 examples/run_mip_example.py
 ```
-This generates `interpolated_mip.png` at the repository root.
+This generates `examples/outputs/interpolated_mip.png`.
 
 #### Notes
-- For reproducible dummy data, set NumPy RNG seed inside `create_dummy_3d_data`.
+- For reproducible dummy data, an RNG seed is set in `examples/run_mip_example.py`.
 - The demo downloads the FILM model at first run; ensure network access.
 
 ### 10. Conclusion

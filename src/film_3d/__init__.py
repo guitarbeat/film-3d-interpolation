@@ -1,4 +1,3 @@
-
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
@@ -211,44 +210,3 @@ def max_intensity_projection(volume: np.ndarray, axis: int = 1) -> np.ndarray:
     """
     assert np.ndim(volume) == 5, "Input volume must be 5D for MIP (batch, depth, height, width, channels)"
     return np.max(volume, axis=axis)
-
-
-if __name__ == '__main__':
-    # Example Usage:
-    # This block demonstrates how to use the Interpolator3D and
-    # max_intensity_projection functions.
-
-    interpolator_3d = Interpolator3D()
-
-    # Simulate two 3D volumes (e.g., 2 time points of 3D data).
-    # Shape: (batch_size, depth, height, width, channels)
-    volume1 = load_volume("volume_t0.tif")
-    volume2 = load_volume("volume_t1.tif")
-
-    # Add batch dimension to the simulated volumes.
-    volume1 = np.expand_dims(volume1, axis=0)
-    volume2 = np.expand_dims(volume2, axis=0)
-
-    # Define the interpolation time. 0.5 means midway between volume1 and volume2.
-    dt = np.array([0.5], dtype=np.float32)
-
-    print("Interpolating 3D volumes...")
-    # Perform 3D interpolation.
-    interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
-
-    # Perform Maximum Intensity Projection on the interpolated volume along the depth axis.
-    print("Performing Maximum Intensity Projection...")
-    mip_image = max_intensity_projection(interpolated_volume, axis=1) # MIP along depth axis
-    print("MIP image shape:", mip_image.shape)
-
-    # In a typical application, you would save or display the mip_image here.
-    # For example, using matplotlib or PIL to visualize the 2D projection.
-    # import matplotlib.pyplot as plt
-    # plt.imshow(mip_image[0, :, :, 0]) # Assuming batch size 1 and 1 channel
-    # plt.title("Maximum Intensity Projection of Interpolated Volume")
-    # plt.show()
-
-    print("3D FILM interpolation and MIP example finished.")
-
-

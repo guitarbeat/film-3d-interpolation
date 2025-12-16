@@ -145,46 +145,63 @@ class Interpolator3D:
     assert x0.shape[1] == x1.shape[1], "Input volumes must have the same depth dimension."
 
     batch_size, depth, height, width, channels = x0.shape
-    interpolated_slices = []
 
-    # Iterate through each depth slice and perform 2D interpolation.
-    for d in range(depth):
-        # Extract 2D slices from the 3D volumes.
-        slice0 = x0[:, d, :, :, :]
-        slice1 = x1[:, d, :, :, :]
+    # Optimizing by processing all slices in a single batch instead of looping.
+    # Reshape (batch, depth, height, width, channels) -> (batch*depth, height, width, channels)
+    x0_reshaped = np.reshape(x0, (batch_size * depth, height, width, channels))
+    x1_reshaped = np.reshape(x1, (batch_size * depth, height, width, channels))
 
-        # Apply padding if alignment is required.
-        if self._align is not None:
-            slice0_padded, bbox_to_crop = _pad_to_align(slice0, self._align)
-            slice1_padded, _ = _pad_to_align(slice1, self._align)
-        else:
-            slice0_padded = slice0
-            slice1_padded = slice1
+    # Apply padding if alignment is required.
+    # _pad_to_align handles 4D input by padding the whole batch at once.
+    if self._align is not None:
+        slice0_padded, bbox_to_crop = _pad_to_align(x0_reshaped, self._align)
+        slice1_padded, _ = _pad_to_align(x1_reshaped, self._align)
+    else:
+        slice0_padded = x0_reshaped
+        slice1_padded = x1_reshaped
 
-        # Convert 1-channel (grayscale) input to 3-channel (RGB) by repeating
-        # the channel, as the FILM model expects 3-channel input.
-        if slice0_padded.shape[-1] == 1:
-            slice0_padded = np.repeat(slice0_padded, 3, axis=-1)
-            slice1_padded = np.repeat(slice1_padded, 3, axis=-1)
+    # Convert 1-channel (grayscale) input to 3-channel (RGB) by repeating
+    # the channel, as the FILM model expects 3-channel input.
+    if slice0_padded.shape[-1] == 1:
+        # slice0_padded is a Tensor if passed through _pad_to_align, or np.ndarray otherwise.
+        # tf.repeat or np.repeat works depending on type, but tf.image.pad_to_bounding_box returns Tensor.
+        if not tf.is_tensor(slice0_padded):
+             slice0_padded = tf.convert_to_tensor(slice0_padded)
+        if not tf.is_tensor(slice1_padded):
+             slice1_padded = tf.convert_to_tensor(slice1_padded)
 
-        # Prepare inputs for the 2D FILM model.
-        inputs = {
-            'x0': slice0_padded,
-            'x1': slice1_padded,
-            'time': dt[..., np.newaxis] # Add a new axis to dt for batch dimension consistency.
-        }
-        # Perform inference using the 2D FILM model.
-        result = self._model(inputs, training=False)
-        image_slice = result['image']
+        slice0_padded = tf.repeat(slice0_padded, 3, axis=-1)
+        slice1_padded = tf.repeat(slice1_padded, 3, axis=-1)
 
-        # Crop the interpolated slice back to its original dimensions if padding was applied.
-        if self._align is not None:
-            image_slice = tf.image.crop_to_bounding_box(image_slice, **bbox_to_crop)
-        # Convert the TensorFlow Tensor result to a NumPy array and store it.
-        interpolated_slices.append(image_slice.numpy())
+    # Prepare time input. dt is (batch_size,). We need it to be (batch_size * depth, 1).
+    # First, repeat each element 'depth' times.
+    # dt: [t1, t2] -> [t1, t1, ..., t2, t2, ...]
+    dt_repeated = np.repeat(dt, depth)
+    dt_reshaped = dt_repeated[..., np.newaxis] # (batch*depth, 1)
 
-    # Stack all interpolated 2D slices back together to form the 5D interpolated volume.
-    interpolated_volume = np.stack(interpolated_slices, axis=1)
+    # Prepare inputs for the 2D FILM model.
+    inputs = {
+        'x0': slice0_padded,
+        'x1': slice1_padded,
+        'time': dt_reshaped
+    }
+
+    # Perform inference using the 2D FILM model on the entire batch.
+    result = self._model(inputs, training=False)
+    image_batch = result['image']
+
+    # Crop the interpolated slices back to original dimensions if padding was applied.
+    if self._align is not None:
+        image_batch = tf.image.crop_to_bounding_box(image_batch, **bbox_to_crop)
+
+    # Convert result back to numpy
+    interpolated_flat = image_batch.numpy()
+
+    # Reshape back to 5D: (batch*depth, H, W, C) -> (batch, depth, H, W, C)
+    # Note: The model output is always 3 channels (RGB).
+    out_channels = interpolated_flat.shape[-1]
+    interpolated_volume = np.reshape(interpolated_flat, (batch_size, depth, height, width, out_channels))
+
     return interpolated_volume
 
 def max_intensity_projection(volume: np.ndarray, axis: int = 1) -> np.ndarray:

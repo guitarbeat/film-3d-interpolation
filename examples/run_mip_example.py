@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from film_3d import Interpolator3D, max_intensity_projection
 
 
-def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5) -> np.ndarray:
+def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:
     """Creates dummy 3D volumetric data containing simple 'sticks' for demonstration purposes.
 
     This function generates a 5D NumPy array representing a batch of 3D volumes.
@@ -14,7 +14,7 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
     data = np.zeros(shape, dtype=np.float32)
     batch_size, depth, height, width, channels = shape
 
-    rng = np.random.default_rng(1234)
+    rng = np.random.default_rng(seed)
 
     for b in range(batch_size):
         for _ in range(num_sticks):
@@ -36,8 +36,9 @@ if __name__ == '__main__':
     interpolator_3d = Interpolator3D()
 
     print("Creating dummy 3D data...")
-    volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5)
-    volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5)
+    # Use different seeds to ensure the volumes are different, making interpolation meaningful.
+    volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
+    volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
 
     dt = np.array([0.5], dtype=np.float32)
 
@@ -54,8 +55,12 @@ if __name__ == '__main__':
     out_path = os.path.join(out_dir, 'interpolated_mip.png')
 
     plt.figure(figsize=(6, 6))
-    plt.imshow(mip_image[0, :, :, 0], cmap='gray')
-    plt.title("Maximum Intensity Projection of Interpolated Volume")
-    plt.colorbar()
+    plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("MIP of Interpolated Volume (t=0.5)")
+    plt.xlabel("Width (pixels)")
+    plt.ylabel("Height (pixels)")
+    cbar = plt.colorbar()
+    cbar.set_label("Intensity")
+    plt.tight_layout()
     plt.savefig(out_path)
     print(f"Saved MIP image to {out_path}")

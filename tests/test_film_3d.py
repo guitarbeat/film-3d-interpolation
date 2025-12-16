@@ -59,6 +59,31 @@ class TestFilm3D(unittest.TestCase):
 
         np.testing.assert_array_equal(mip_complex, expected_complex_mip)
 
+    def test_interpolator_3d(self):
+        """Tests the Interpolator3D class.
+
+        Verifies that the interpolator can process a small 3D volume
+        and return the correct shape.
+        """
+        interpolator = Interpolator3D(align=16)
+        batch_size = 1
+        depth = 4
+        height = 64
+        width = 64
+        channels = 1
+
+        x0 = np.random.rand(batch_size, depth, height, width, channels).astype(np.float32)
+        x1 = np.random.rand(batch_size, depth, height, width, channels).astype(np.float32)
+        dt = np.array([0.5], dtype=np.float32)
+
+        result = interpolator(x0, x1, dt)
+
+        # Expected output channels is 3 because FILM model outputs RGB
+        expected_shape = (batch_size, depth, height, width, 3)
+        self.assertEqual(result.shape, expected_shape)
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.dtype, np.float32)
+
 
 if __name__ == '__main__':
     unittest.main()

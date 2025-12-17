@@ -1,6 +1,11 @@
 import os
+# Suppress TensorFlow logs for cleaner CLI output
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 from film_3d import Interpolator3D, max_intensity_projection
 
 
@@ -32,35 +37,72 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
     return data
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run FILM 3D MIP Example")
+    parser.add_argument("--output-dir", type=str, default=os.path.join(os.path.dirname(__file__), 'outputs'),
+                        help="Directory to save outputs")
+    parser.add_argument("--num-frames", type=int, default=1,
+                        help="Number of frames to interpolate between 0 and 1. If > 1, multiple frames are generated.")
+    parser.add_argument("--depth", type=int, default=10, help="Depth of the volume")
+    parser.add_argument("--height", type=int, default=64, help="Height of the volume")
+    parser.add_argument("--width", type=int, default=64, help="Width of the volume")
+    parser.add_argument("--num-sticks", type=int, default=5, help="Number of sticks")
+    parser.add_argument("--stick-length", type=int, default=5, help="Length of sticks")
+    parser.add_argument("--seed", type=int, default=1234, help="Random seed for volume 1")
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    args = parse_args()
+
+    print("Initializing Interpolator3D (loading model)...")
     interpolator_3d = Interpolator3D()
 
-    print("Creating dummy 3D data...")
+    shape = (1, args.depth, args.height, args.width, 1)
+
+    print(f"Creating dummy 3D data with shape {shape}...")
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.
-    volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
-    volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
+    volume1 = create_dummy_3d_data(shape=shape, num_sticks=args.num_sticks, stick_length=args.stick_length, seed=args.seed)
+    volume2 = create_dummy_3d_data(shape=shape, num_sticks=args.num_sticks, stick_length=args.stick_length, seed=args.seed + 1234)
 
-    dt = np.array([0.5], dtype=np.float32)
+    # Determine time points
+    if args.num_frames == 1:
+        time_points = [0.5]
+    else:
+        # Generate N frames evenly spaced between 0 and 1 (exclusive)
+        # e.g. 3 frames -> 0.25, 0.5, 0.75
+        time_points = np.linspace(0, 1, args.num_frames + 2)[1:-1]
 
-    print("Interpolating 3D volumes...")
-    interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
+    os.makedirs(args.output_dir, exist_ok=True)
 
-    print("Performing Maximum Intensity Projection...")
-    mip_image = max_intensity_projection(interpolated_volume, axis=1)
-    print("MIP image shape:", mip_image.shape)
+    print(f"Interpolating {len(time_points)} frames...")
 
-    out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
-    os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, 'interpolated_mip.png')
+    # Iterate over time points with a progress bar
+    for i, t in enumerate(tqdm(time_points, desc="Interpolating")):
+        dt = np.array([t], dtype=np.float32)
+        interpolated_volume = interpolator_3d(volume1, volume2, dt)
 
-    plt.figure(figsize=(6, 6))
-    plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
-    plt.title("MIP of Interpolated Volume (t=0.5)")
-    plt.xlabel("Width (pixels)")
-    plt.ylabel("Height (pixels)")
-    cbar = plt.colorbar()
-    cbar.set_label("Intensity")
-    plt.tight_layout()
-    plt.savefig(out_path)
-    print(f"Saved MIP image to {out_path}")
+        mip_image = max_intensity_projection(interpolated_volume, axis=1)
+
+        # Save image
+        out_filename = f'interpolated_mip_t{t:.2f}.png'
+        if args.num_frames == 1:
+             out_filename = 'interpolated_mip.png'
+
+        out_path = os.path.join(args.output_dir, out_filename)
+
+        plt.figure(figsize=(6, 6))
+        plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+        plt.title(f"MIP (t={t:.2f})")
+        plt.xlabel("Width (pixels)")
+        plt.ylabel("Height (pixels)")
+        # Only add colorbar once or it messes up layout in loop?
+        # Actually standard plt usage creates new figure each time if we don't close.
+        # But we called plt.figure() inside loop.
+        cbar = plt.colorbar()
+        cbar.set_label("Intensity")
+        plt.tight_layout()
+        plt.savefig(out_path)
+        plt.close() # Close to free memory
+
+    print(f"Saved {len(time_points)} MIP images to {args.output_dir}")

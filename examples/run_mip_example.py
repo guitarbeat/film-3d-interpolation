@@ -1,4 +1,8 @@
 import os
+
+# Suppress verbose TensorFlow logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 import matplotlib.pyplot as plt
 from film_3d import Interpolator3D, max_intensity_projection
@@ -33,34 +37,61 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
+    print("✨ Starting 3D Interpolation Demo ✨")
+
+    print("🎨 Loading FILM model from TF Hub (this may take a moment)...")
     interpolator_3d = Interpolator3D()
 
-    print("Creating dummy 3D data...")
+    print("🎲 Creating dummy 3D data...")
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.
     volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
     volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
 
     dt = np.array([0.5], dtype=np.float32)
 
-    print("Interpolating 3D volumes...")
+    print("🔄 Interpolating 3D volumes...")
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
+    print(f"✅ Interpolation complete. Shape: {interpolated_volume.shape}")
 
-    print("Performing Maximum Intensity Projection...")
-    mip_image = max_intensity_projection(interpolated_volume, axis=1)
-    print("MIP image shape:", mip_image.shape)
+    print("📊 Performing Maximum Intensity Projection (MIP) for comparison...")
+    # Calculate MIPs for all three volumes for comparison
+    mip_v1 = max_intensity_projection(volume1, axis=1)
+    mip_interp = max_intensity_projection(interpolated_volume, axis=1)
+    mip_v2 = max_intensity_projection(volume2, axis=1)
 
     out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
     os.makedirs(out_dir, exist_ok=True)
-    out_path = os.path.join(out_dir, 'interpolated_mip.png')
+    out_path = os.path.join(out_dir, 'interpolated_comparison_mip.png')
 
-    plt.figure(figsize=(6, 6))
-    plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
-    plt.title("MIP of Interpolated Volume (t=0.5)")
-    plt.xlabel("Width (pixels)")
-    plt.ylabel("Height (pixels)")
-    cbar = plt.colorbar()
-    cbar.set_label("Intensity")
-    plt.tight_layout()
-    plt.savefig(out_path)
-    print(f"Saved MIP image to {out_path}")
+    # Create a comparison plot
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    # Helper to plot
+    def plot_mip(ax, data, title):
+        # Handle 1-channel data for display
+        if data.shape[-1] == 1:
+            display_data = data[0, :, :, 0]
+            cmap = 'gray'
+        else:
+            display_data = data[0]
+            cmap = None
+
+        im = ax.imshow(display_data, cmap=cmap, vmin=0, vmax=1)
+        ax.set_title(title)
+        ax.axis('off')
+        return im
+
+    plot_mip(axes[0], mip_v1, "Start Volume (t=0)")
+    plot_mip(axes[1], mip_interp, "Interpolated (t=0.5)")
+    im = plot_mip(axes[2], mip_v2, "End Volume (t=1)")
+
+    # Add colorbar
+    fig.subplots_adjust(right=0.9)
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    fig.colorbar(im, cax=cbar_ax, label="Intensity")
+
+    plt.suptitle("3D Volume Interpolation - Maximum Intensity Projections", fontsize=16)
+    plt.savefig(out_path, bbox_inches='tight')
+
+    print(f"🖼️  Saved comparison MIP image to: {out_path}")
+    print("👋 Demo finished successfully!")

@@ -1,4 +1,7 @@
 import os
+# Suppress TensorFlow logs before importing it
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 import matplotlib.pyplot as plt
 from film_3d import Interpolator3D, max_intensity_projection
@@ -33,34 +36,53 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
+    print("🤖 Loading FILM model...")
     interpolator_3d = Interpolator3D()
 
-    print("Creating dummy 3D data...")
+    print("🎲 Creating dummy 3D data...")
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.
     volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
     volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
 
     dt = np.array([0.5], dtype=np.float32)
 
-    print("Interpolating 3D volumes...")
+    print("🎞️  Interpolating 3D volumes...")
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
+    print("✅ Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
 
-    print("Performing Maximum Intensity Projection...")
-    mip_image = max_intensity_projection(interpolated_volume, axis=1)
-    print("MIP image shape:", mip_image.shape)
+    print("🔬 Performing Maximum Intensity Projection...")
+    # Calculate MIPs for all volumes to show side-by-side comparison
+    mip_v1 = max_intensity_projection(volume1, axis=1)
+    mip_interp = max_intensity_projection(interpolated_volume, axis=1)
+    mip_v2 = max_intensity_projection(volume2, axis=1)
+
+    print("✅ MIP image shape:", mip_interp.shape)
 
     out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, 'interpolated_mip.png')
 
-    plt.figure(figsize=(6, 6))
-    plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
-    plt.title("MIP of Interpolated Volume (t=0.5)")
-    plt.xlabel("Width (pixels)")
-    plt.ylabel("Height (pixels)")
-    cbar = plt.colorbar()
-    cbar.set_label("Intensity")
+    # Enhanced visualization: Side-by-side comparison
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    # Plot Start Volume
+    im0 = axes[0].imshow(mip_v1[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    axes[0].set_title("Start Volume (MIP)")
+    axes[0].axis('off')
+
+    # Plot Interpolated Volume
+    # Interpolated volume is RGB, so we take the first channel or convert to gray if needed.
+    # The FILM model outputs RGB, so let's display it as is or take one channel.
+    # Since inputs were grayscale and converted to RGB, the output should be grayscale-ish.
+    im1 = axes[1].imshow(mip_interp[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    axes[1].set_title("Interpolated (t=0.5) (MIP)")
+    axes[1].axis('off')
+
+    # Plot End Volume
+    im2 = axes[2].imshow(mip_v2[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    axes[2].set_title("End Volume (MIP)")
+    axes[2].axis('off')
+
     plt.tight_layout()
     plt.savefig(out_path)
-    print(f"Saved MIP image to {out_path}")
+    print(f"💾 Saved comparison MIP image to {out_path}")

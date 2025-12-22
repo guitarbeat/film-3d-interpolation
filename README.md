@@ -46,7 +46,7 @@ This repository aims to extend the Frame Interpolation for Large Motion (FILM) m
     PYTHONPATH=src python3 examples/run_mip_example.py
     ```
 
-    This will generate an image at `examples/outputs/interpolated_mip.png` showing the 2D MIP of the interpolated 3D data.
+    This will generate an image at `examples/outputs/interpolated_mip.png` showing a side-by-side comparison of the start, interpolated, and end volumes using Maximum Intensity Projection (MIP).
 
 ## Code Structure
 

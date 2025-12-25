@@ -1,4 +1,8 @@
 import os
+
+# Suppress TensorFlow logs before importing it
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 import matplotlib.pyplot as plt
 from film_3d import Interpolator3D, max_intensity_projection
@@ -33,22 +37,25 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
+    print("🎨 FILM 3D Example Starting...")
+
+    print("📦 Loading FILM model (this may take a moment on first run)...")
     interpolator_3d = Interpolator3D()
 
-    print("Creating dummy 3D data...")
+    print("🎲 Creating dummy 3D data...")
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.
     volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
     volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
 
     dt = np.array([0.5], dtype=np.float32)
 
-    print("Interpolating 3D volumes...")
+    print("✨ Interpolating 3D volumes...")
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
+    print(f"✅ Interpolation complete. Interpolated volume shape: {interpolated_volume.shape}")
 
-    print("Performing Maximum Intensity Projection...")
+    print("📊 Performing Maximum Intensity Projection...")
     mip_image = max_intensity_projection(interpolated_volume, axis=1)
-    print("MIP image shape:", mip_image.shape)
+    print(f"✅ MIP image shape: {mip_image.shape}")
 
     out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
     os.makedirs(out_dir, exist_ok=True)
@@ -63,4 +70,5 @@ if __name__ == '__main__':
     cbar.set_label("Intensity")
     plt.tight_layout()
     plt.savefig(out_path)
-    print(f"Saved MIP image to {out_path}")
+    print(f"💾 Saved MIP image to {out_path}")
+    print("🎉 Done!")

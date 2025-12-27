@@ -1,6 +1,11 @@
 import os
+
+# 🎨 Palette: Suppress TensorFlow logs for a cleaner CLI experience
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 from film_3d import Interpolator3D, max_intensity_projection
 
 
@@ -33,34 +38,60 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
+    print("\n🎬 \033[1mFILM-3D: Starting MIP Example Script\033[0m")
+    print("---------------------------------------")
+
     interpolator_3d = Interpolator3D()
 
-    print("Creating dummy 3D data...")
+    print("\n🎲 Creating dummy 3D data...")
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.
     volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
     volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
+    print("   Created 2 volumes with random 'sticks'.")
 
     dt = np.array([0.5], dtype=np.float32)
 
-    print("Interpolating 3D volumes...")
+    print("\n⚡ Interpolating 3D volumes (this may take a moment)...")
+    start_time = time.time()
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
+    elapsed = time.time() - start_time
+    print(f"✅ Interpolation complete in {elapsed:.2f}s.")
+    print(f"   Output shape: {interpolated_volume.shape}")
 
-    print("Performing Maximum Intensity Projection...")
-    mip_image = max_intensity_projection(interpolated_volume, axis=1)
-    print("MIP image shape:", mip_image.shape)
+    print("\n📊 Computing Maximum Intensity Projections (MIP)...")
+    mip_start = max_intensity_projection(volume1, axis=1)
+    mip_interp = max_intensity_projection(interpolated_volume, axis=1)
+    mip_end = max_intensity_projection(volume2, axis=1)
+    print("   MIP computation done.")
 
     out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, 'interpolated_mip.png')
 
-    plt.figure(figsize=(6, 6))
-    plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
-    plt.title("MIP of Interpolated Volume (t=0.5)")
-    plt.xlabel("Width (pixels)")
-    plt.ylabel("Height (pixels)")
-    cbar = plt.colorbar()
-    cbar.set_label("Intensity")
+    print(f"\n🖼️  Generating visualization...")
+    # 🎨 Palette: Improved visualization with side-by-side comparison
+    plt.figure(figsize=(15, 6))
+
+    # Plot Start Frame
+    plt.subplot(1, 3, 1)
+    plt.imshow(mip_start[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("Start Volume (MIP)")
+    plt.axis('off')
+
+    # Plot Interpolated Frame
+    plt.subplot(1, 3, 2)
+    # Note: Interpolated volume might be 3 channels (RGB) due to FILM model, take 0th channel
+    plt.imshow(mip_interp[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("Interpolated Volume (t=0.5)")
+    plt.axis('off')
+
+    # Plot End Frame
+    plt.subplot(1, 3, 3)
+    plt.imshow(mip_end[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("End Volume (MIP)")
+    plt.axis('off')
+
     plt.tight_layout()
     plt.savefig(out_path)
-    print(f"Saved MIP image to {out_path}")
+    print(f"✅ Saved comparison image to: \033[4m{out_path}\033[0m")
+    print("\n✨ Done! Open the image to see the results.\n")

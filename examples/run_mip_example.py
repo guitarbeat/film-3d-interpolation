@@ -1,8 +1,14 @@
 import os
+import sys
+import warnings
+
+# Suppress TF logs - MUST be set before importing tensorflow (which happens in film_3d)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+warnings.filterwarnings('ignore')
+
 import numpy as np
 import matplotlib.pyplot as plt
 from film_3d import Interpolator3D, max_intensity_projection
-
 
 def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:
     """Creates dummy 3D volumetric data containing simple 'sticks' for demonstration purposes.
@@ -33,34 +39,64 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
+    print("🎨 Initializing 3D Interpolator (this may take a moment)...")
+    sys.stdout.flush()
     interpolator_3d = Interpolator3D()
 
-    print("Creating dummy 3D data...")
+    print("🎲 Creating dummy 3D data...")
+    sys.stdout.flush()
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.
     volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
     volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
 
     dt = np.array([0.5], dtype=np.float32)
 
-    print("Interpolating 3D volumes...")
+    print("🧠 Interpolating 3D volumes...")
+    sys.stdout.flush()
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print("Interpolation complete. Interpolated volume shape:", interpolated_volume.shape)
+    print(f"✨ Interpolation complete. Shape: {interpolated_volume.shape}")
 
-    print("Performing Maximum Intensity Projection...")
-    mip_image = max_intensity_projection(interpolated_volume, axis=1)
-    print("MIP image shape:", mip_image.shape)
+    print("📊 Performing Maximum Intensity Projections...")
+    sys.stdout.flush()
+
+    # Compute MIPs for all three stages
+    # Note: interpolated_volume is RGB (channels=3), while inputs are grayscale (channels=1)
+    mip_start = max_intensity_projection(volume1, axis=1)
+    mip_interp = max_intensity_projection(interpolated_volume, axis=1)
+    mip_end = max_intensity_projection(volume2, axis=1)
 
     out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, 'interpolated_mip.png')
 
-    plt.figure(figsize=(6, 6))
-    plt.imshow(mip_image[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
-    plt.title("MIP of Interpolated Volume (t=0.5)")
-    plt.xlabel("Width (pixels)")
-    plt.ylabel("Height (pixels)")
-    cbar = plt.colorbar()
-    cbar.set_label("Intensity")
+    print(f"🖼️  Generating side-by-side comparison plot...")
+    sys.stdout.flush()
+
+    plt.figure(figsize=(15, 6))
+
+    # Plot Start (t=0)
+    plt.subplot(1, 3, 1)
+    # Handle potentially 1 or 3 channels. If 1, squeeze. If 3, take first or use as is.
+    # Since inputs are definitely grayscale (..., 1), we just show channel 0 with gray cmap.
+    plt.imshow(mip_start[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("Start Volume (t=0)")
+    plt.axis('off')
+
+    # Plot Interpolated (t=0.5)
+    plt.subplot(1, 3, 2)
+    # Interpolated is RGB. If we want grayscale, we can take just the first channel
+    # since we know the content is effectively grayscale, or display as is.
+    # To be safe and consistent with "gray" inputs, let's show it as grayscale.
+    plt.imshow(mip_interp[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("Interpolated (t=0.5)")
+    plt.axis('off')
+
+    # Plot End (t=1)
+    plt.subplot(1, 3, 3)
+    plt.imshow(mip_end[0, :, :, 0], cmap='gray', vmin=0, vmax=1)
+    plt.title("End Volume (t=1)")
+    plt.axis('off')
+
     plt.tight_layout()
-    plt.savefig(out_path)
-    print(f"Saved MIP image to {out_path}")
+    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    print(f"💾 Saved comparison image to {out_path}")

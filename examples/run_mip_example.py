@@ -39,8 +39,14 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
-    # Initialize the interpolator
-    interpolator_3d = Interpolator3D()
+    print("📥 Loading FILM model (this may take a moment on first run)...", flush=True)
+    try:
+        # Initialize the interpolator
+        interpolator_3d = Interpolator3D()
+    except Exception as e:
+        print(f"\n❌ Error loading model: {e}")
+        print("💡 Tip: Ensure you have an active internet connection to download the model from TensorFlow Hub.")
+        exit(1)
 
     print("🎲 Creating dummy 3D data...", flush=True)
     # Use different seeds to ensure the volumes are different, making interpolation meaningful.

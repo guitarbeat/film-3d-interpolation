@@ -154,11 +154,21 @@ class Interpolator3D:
     # Apply padding if alignment is required.
     # _pad_to_align handles 4D input by padding the whole batch at once.
     if self._align is not None:
-        slice0_padded, bbox_to_crop = _pad_to_align(x0_reshaped, self._align)
-        slice1_padded, _ = _pad_to_align(x1_reshaped, self._align)
+        # Optimization: Skip padding if dimensions are already aligned.
+        # This avoids unnecessary TF ops (pad and crop) when they are no-ops.
+        if height % self._align == 0 and width % self._align == 0:
+            # Note: We must convert to tensor because tf.image.grayscale_to_rgb expects a Tensor,
+            # and x0_reshaped/x1_reshaped are numpy arrays.
+            slice0_padded = tf.convert_to_tensor(x0_reshaped)
+            slice1_padded = tf.convert_to_tensor(x1_reshaped)
+            bbox_to_crop = None
+        else:
+            slice0_padded, bbox_to_crop = _pad_to_align(x0_reshaped, self._align)
+            slice1_padded, _ = _pad_to_align(x1_reshaped, self._align)
     else:
         slice0_padded = x0_reshaped
         slice1_padded = x1_reshaped
+        bbox_to_crop = None
 
     # Convert 1-channel (grayscale) input to 3-channel (RGB) by repeating
     # the channel, as the FILM model expects 3-channel input.
@@ -188,7 +198,7 @@ class Interpolator3D:
     image_batch = result['image']
 
     # Crop the interpolated slices back to original dimensions if padding was applied.
-    if self._align is not None:
+    if self._align is not None and bbox_to_crop is not None:
         image_batch = tf.image.crop_to_bounding_box(image_batch, **bbox_to_crop)
 
     # Convert result back to numpy

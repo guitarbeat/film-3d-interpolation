@@ -29,7 +29,7 @@ def load_volume(vol_path: str) -> np.ndarray:
   dummy_volume = np.random.rand(10, 128, 128, 1).astype(np.float32)
   return dummy_volume
 
-def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, dict]:
+def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]:
   """Pads an image batch or 3D volume so its height and width are divisible by 'align'.
 
   This padding is necessary for models that require input dimensions to be
@@ -47,7 +47,7 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, dict]:
     - bbox_to_crop: A dictionary containing bounding box information
                     (offset_height, offset_width, target_height, target_width)
                     that can be used with `tf.image.crop_to_bounding_box`
-                    to revert the padding.
+                    to revert the padding. Returns None if no padding was applied.
   """
   # Input validation: ensure the input array has 4 or 5 dimensions.
   assert np.ndim(x) == 4 or np.ndim(x) == 5, \
@@ -65,6 +65,13 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, dict]:
   # Calculate padding needed for height and width.
   height_to_pad = (align - height % align) if height % align != 0 else 0
   width_to_pad = (align - width % align) if width % align != 0 else 0
+
+  if height_to_pad == 0 and width_to_pad == 0:
+      # If already aligned, skip padding operations and return None for bbox.
+      # Ensure output is a Tensor for consistency.
+      if not tf.is_tensor(x):
+          x = tf.convert_to_tensor(x)
+      return x, None
 
   # Define the bounding box for padding.
   bbox_to_pad = {
@@ -188,7 +195,7 @@ class Interpolator3D:
     image_batch = result['image']
 
     # Crop the interpolated slices back to original dimensions if padding was applied.
-    if self._align is not None:
+    if self._align is not None and bbox_to_crop is not None:
         image_batch = tf.image.crop_to_bounding_box(image_batch, **bbox_to_crop)
 
     # Convert result back to numpy

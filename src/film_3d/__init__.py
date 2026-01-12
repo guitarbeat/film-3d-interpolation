@@ -118,7 +118,13 @@ class Interpolator3D:
              a common requirement for deep learning models.
     """
     # Load the pre-trained 2D FILM model from TensorFlow Hub.
-    self._model = hub.load("https://tfhub.dev/google/film/1")
+    try:
+      self._model = hub.load("https://tfhub.dev/google/film/1")
+    except Exception as e:
+      print("\n❌ Error loading FILM model from TensorFlow Hub.", flush=True)
+      print("💡 Please check your internet connection.", flush=True)
+      print(f"📄 Details: {e}\n", flush=True)
+      raise RuntimeError("Failed to initialize Interpolator3D due to model loading error.") from e
     self._align = align
 
   def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray) -> np.ndarray:

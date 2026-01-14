@@ -7,7 +7,28 @@ warnings.filterwarnings('ignore')
 
 import numpy as np
 import matplotlib.pyplot as plt
+from contextlib import contextmanager
 from film_3d import Interpolator3D, max_intensity_projection
+
+# Try to import rich for better CLI UX
+try:
+    from rich.console import Console
+    console = Console()
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+    console = None
+
+
+@contextmanager
+def cli_status(message: str):
+    """Context manager for CLI status updates, using rich if available."""
+    if RICH_AVAILABLE and console:
+        with console.status(message, spinner="dots"):
+            yield
+    else:
+        print(message, flush=True)
+        yield
 
 
 def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:
@@ -39,31 +60,39 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
-    print("⬇️ Loading FILM model (this may take a moment on first run)...", flush=True)
     try:
-        # Initialize the interpolator
-        interpolator_3d = Interpolator3D()
+        with cli_status("⬇️ Loading FILM model (this may take a moment on first run)..."):
+            # Initialize the interpolator
+            interpolator_3d = Interpolator3D()
     except Exception as e:
-        print(f"\n❌ Error loading FILM model: {e}")
-        print("💡 Please check your internet connection and try again.")
+        if RICH_AVAILABLE and console:
+            console.print(f"\n❌ Error loading FILM model: {e}", style="bold red")
+            console.print("💡 Please check your internet connection and try again.", style="yellow")
+        else:
+            print(f"\n❌ Error loading FILM model: {e}")
+            print("💡 Please check your internet connection and try again.")
         exit(1)
 
-    print("🎲 Creating dummy 3D data...", flush=True)
-    # Use different seeds to ensure the volumes are different, making interpolation meaningful.
-    volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
-    volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
+    with cli_status("🎲 Creating dummy 3D data..."):
+        # Use different seeds to ensure the volumes are different, making interpolation meaningful.
+        volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=1234)
+        volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), num_sticks=5, stick_length=5, seed=5678)
 
     dt = np.array([0.5], dtype=np.float32)
 
-    print("⏳ Interpolating 3D volumes...", flush=True)
-    interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print(f"✅ Interpolation complete. Volume shape: {interpolated_volume.shape}", flush=True)
+    with cli_status("⏳ Interpolating 3D volumes..."):
+        interpolated_volume = interpolator_3d(volume1, volume2, dt)
 
-    print("🎥 Performing Maximum Intensity Projection...", flush=True)
-    # Perform MIP on all volumes for comparison
-    mip_v1 = max_intensity_projection(volume1, axis=1)
-    mip_interp = max_intensity_projection(interpolated_volume, axis=1)
-    mip_v2 = max_intensity_projection(volume2, axis=1)
+    if RICH_AVAILABLE and console:
+        console.print(f"✅ Interpolation complete. Volume shape: {interpolated_volume.shape}", style="bold green")
+    else:
+        print(f"✅ Interpolation complete. Volume shape: {interpolated_volume.shape}", flush=True)
+
+    with cli_status("🎥 Performing Maximum Intensity Projection..."):
+        # Perform MIP on all volumes for comparison
+        mip_v1 = max_intensity_projection(volume1, axis=1)
+        mip_interp = max_intensity_projection(interpolated_volume, axis=1)
+        mip_v2 = max_intensity_projection(volume2, axis=1)
 
     out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
     os.makedirs(out_dir, exist_ok=True)
@@ -94,4 +123,9 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     plt.savefig(out_path)
-    print(f"✨ Saved comparison MIP image to {out_path}", flush=True)
+
+    if RICH_AVAILABLE and console:
+        from rich.panel import Panel
+        console.print(Panel(f"✨ Saved comparison MIP image to [link=file://{out_path}]{out_path}[/link]", title="Success", style="bold green"))
+    else:
+        print(f"✨ Saved comparison MIP image to {out_path}", flush=True)

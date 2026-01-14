@@ -124,6 +124,16 @@ class Interpolator3D:
     self._model = hub.load("https://tfhub.dev/google/film/1")
     self._align = align
 
+  @tf.function(jit_compile=True)
+  def _run_inference(self, x0, x1, time):
+    """Runs the FILM model inference using XLA compilation for performance."""
+    inputs = {
+        'x0': x0,
+        'x1': x1,
+        'time': time
+    }
+    return self._model(inputs, training=False)['image']
+
   def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray) -> np.ndarray:
     """Generates an interpolated 3D volume between two given 3D volumes.
 
@@ -179,16 +189,8 @@ class Interpolator3D:
     dt_repeated = np.repeat(dt, depth)
     dt_reshaped = dt_repeated[..., np.newaxis] # (batch*depth, 1)
 
-    # Prepare inputs for the 2D FILM model.
-    inputs = {
-        'x0': slice0_padded,
-        'x1': slice1_padded,
-        'time': dt_reshaped
-    }
-
     # Perform inference using the 2D FILM model on the entire batch.
-    result = self._model(inputs, training=False)
-    image_batch = result['image']
+    image_batch = self._run_inference(slice0_padded, slice1_padded, dt_reshaped)
 
     # Crop the interpolated slices back to original dimensions if padding was applied.
     if self._align is not None and bbox_to_crop is not None:

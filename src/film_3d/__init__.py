@@ -77,21 +77,20 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]
       'target_width': width + width_to_pad
   }
 
-  # Apply padding to each 2D slice of the volume independently.
-  padded_x_slices = []
-  for d in range(depth):
-      if np.ndim(x) == 5:
-          # Extract a 2D slice from the 5D volume and pad it.
-          padded_x_slices.append(tf.image.pad_to_bounding_box(x[:, d, :, :, :], **bbox_to_pad))
-      else:
-          # If 4D, pad the entire image batch.
-          padded_x_slices.append(tf.image.pad_to_bounding_box(x, **bbox_to_pad))
-
-  # Stack the padded slices back into the original dimension format.
+  # Apply padding.
+  # Optimization: Reshape 5D to 4D to pad all slices in one op instead of looping.
   if np.ndim(x) == 5:
-      padded_x = tf.stack(padded_x_slices, axis=1) # Stack back into 5D volume.
+      # Reshape (batch, depth, height, width, channels) -> (batch*depth, height, width, channels)
+      x_reshaped = tf.reshape(x, [batch_size * depth, height, width, channels])
+      padded_reshaped = tf.image.pad_to_bounding_box(x_reshaped, **bbox_to_pad)
+
+      # Reshape back to 5D: (batch, depth, padded_height, padded_width, channels)
+      target_height = bbox_to_pad['target_height']
+      target_width = bbox_to_pad['target_width']
+      padded_x = tf.reshape(padded_reshaped, [batch_size, depth, target_height, target_width, channels])
   else:
-      padded_x = padded_x_slices[0] # Remains 4D image batch.
+      # If 4D, pad the entire image batch directly.
+      padded_x = tf.image.pad_to_bounding_box(x, **bbox_to_pad)
 
   # Define the bounding box for cropping back to original dimensions after inference.
   bbox_to_crop = {
@@ -123,6 +122,14 @@ class Interpolator3D:
     # Load the pre-trained 2D FILM model from TensorFlow Hub.
     self._model = hub.load("https://tfhub.dev/google/film/1")
     self._align = align
+
+  @tf.function
+  def _run_inference(self, inputs):
+      """Runs model inference.
+
+      Separated to allow efficient graph execution.
+      """
+      return self._model(inputs, training=False)
 
   def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray) -> np.ndarray:
     """Generates an interpolated 3D volume between two given 3D volumes.
@@ -187,7 +194,8 @@ class Interpolator3D:
     }
 
     # Perform inference using the 2D FILM model on the entire batch.
-    result = self._model(inputs, training=False)
+    # Optimization: Using JIT-compiled inference
+    result = self._run_inference(inputs)
     image_batch = result['image']
 
     # Crop the interpolated slices back to original dimensions if padding was applied.

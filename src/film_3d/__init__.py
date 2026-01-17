@@ -124,6 +124,35 @@ class Interpolator3D:
     self._model = hub.load("https://tfhub.dev/google/film/1")
     self._align = align
 
+  @tf.function
+  def _run_inference(self, x0, x1, time):
+    """Runs the FILM model inference within a TensorFlow graph.
+
+    This method is decorated with @tf.function to compile it into a graph,
+    optimizing performance by avoiding Python interpreter overhead during
+    execution. It also handles the conversion from grayscale to RGB if necessary.
+    """
+    # Convert 1-channel (grayscale) input to 3-channel (RGB) by repeating
+    # the channel, as the FILM model expects 3-channel input.
+    # Checking shape[-1] works on both Tensors and NumPy arrays.
+    if x0.shape[-1] == 1:
+        # x0 is a Tensor if passed through _pad_to_align, or np.ndarray otherwise.
+        # tf.image.grayscale_to_rgb handles both Tensor and np.ndarray (converts to Tensor).
+        # We prefer tf.image.grayscale_to_rgb over tf.repeat for performance (approx 20% gain)
+        # and better semantics when converting grayscale to RGB.
+        x0 = tf.image.grayscale_to_rgb(x0)
+        x1 = tf.image.grayscale_to_rgb(x1)
+
+    inputs = {
+        'x0': x0,
+        'x1': x1,
+        'time': time
+    }
+
+    # Perform inference using the 2D FILM model.
+    result = self._model(inputs, training=False)
+    return result['image']
+
   def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray) -> np.ndarray:
     """Generates an interpolated 3D volume between two given 3D volumes.
 
@@ -163,32 +192,15 @@ class Interpolator3D:
         slice0_padded = x0_reshaped
         slice1_padded = x1_reshaped
 
-    # Convert 1-channel (grayscale) input to 3-channel (RGB) by repeating
-    # the channel, as the FILM model expects 3-channel input.
-    if slice0_padded.shape[-1] == 1:
-        # slice0_padded is a Tensor if passed through _pad_to_align, or np.ndarray otherwise.
-        # tf.image.grayscale_to_rgb handles both Tensor and np.ndarray (converts to Tensor).
-        # We prefer tf.image.grayscale_to_rgb over tf.repeat for performance (approx 20% gain)
-        # and better semantics when converting grayscale to RGB.
-        slice0_padded = tf.image.grayscale_to_rgb(slice0_padded)
-        slice1_padded = tf.image.grayscale_to_rgb(slice1_padded)
-
     # Prepare time input. dt is (batch_size,). We need it to be (batch_size * depth, 1).
     # First, repeat each element 'depth' times.
     # dt: [t1, t2] -> [t1, t1, ..., t2, t2, ...]
     dt_repeated = np.repeat(dt, depth)
     dt_reshaped = dt_repeated[..., np.newaxis] # (batch*depth, 1)
 
-    # Prepare inputs for the 2D FILM model.
-    inputs = {
-        'x0': slice0_padded,
-        'x1': slice1_padded,
-        'time': dt_reshaped
-    }
-
     # Perform inference using the 2D FILM model on the entire batch.
-    result = self._model(inputs, training=False)
-    image_batch = result['image']
+    # We use the compiled _run_inference method for better performance.
+    image_batch = self._run_inference(slice0_padded, slice1_padded, dt_reshaped)
 
     # Crop the interpolated slices back to original dimensions if padding was applied.
     if self._align is not None and bbox_to_crop is not None:

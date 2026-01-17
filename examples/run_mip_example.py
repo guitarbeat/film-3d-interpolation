@@ -1,10 +1,12 @@
 import os
+import time
 import warnings
 
 # Suppress TensorFlow logs and warnings for a cleaner CLI experience
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 warnings.filterwarnings('ignore')
 
+import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from film_3d import Interpolator3D, max_intensity_projection
@@ -39,6 +41,11 @@ def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5,
 
 
 if __name__ == '__main__':
+    # Detect and report device
+    gpus = tf.config.list_physical_devices('GPU')
+    device = f"GPU ({len(gpus)} found)" if gpus else "CPU"
+    print(f"🚀 Running on {device}")
+
     print("⬇️ Loading FILM model (this may take a moment on first run)...", flush=True)
     try:
         # Initialize the interpolator
@@ -56,8 +63,10 @@ if __name__ == '__main__':
     dt = np.array([0.5], dtype=np.float32)
 
     print("⏳ Interpolating 3D volumes...", flush=True)
+    start_time = time.time()
     interpolated_volume = interpolator_3d(volume1, volume2, dt)
-    print(f"✅ Interpolation complete. Volume shape: {interpolated_volume.shape}", flush=True)
+    elapsed = time.time() - start_time
+    print(f"✅ Interpolation complete in {elapsed:.2f}s. Volume shape: {interpolated_volume.shape}", flush=True)
 
     print("🎥 Performing Maximum Intensity Projection...", flush=True)
     # Perform MIP on all volumes for comparison

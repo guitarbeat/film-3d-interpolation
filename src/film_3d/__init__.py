@@ -124,7 +124,7 @@ class Interpolator3D:
     self._model = hub.load("https://tfhub.dev/google/film/1")
     self._align = align
 
-  @tf.function(jit_compile=True)
+  @tf.function(jit_compile=False)
   def _run_inference(self, x0, x1, time):
     """Runs the FILM model inference (optimized with tf.function)."""
     # Convert 1-channel (grayscale) input to 3-channel (RGB).

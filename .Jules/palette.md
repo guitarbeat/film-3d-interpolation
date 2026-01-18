@@ -5,3 +5,7 @@
 ## 2026-01-13 - Rich CLI Feedback
 **Learning:** Standard print statements get lost in the noise. Using structured output (Panels) and visual indicators (spinners, emojis) significantly improves perceived performance and clarity of CLI tools.
 **Action:** Use the `rich` library for all user-facing CLI scripts to provide consistent, accessible, and visually appealing feedback (spinners for blocking ops, panels for context).
+
+## 2026-01-18 - Scientific CLI Structure
+**Learning:** For data-intensive CLI tools, users value explicit step tracking ("[1/3]") and a final data summary table (input vs output shapes) to verify correctness without needing to open output files immediately.
+**Action:** Implement step counters in status messages and a 'Data Summary' table at the end of processing scripts to confirm dimensional integrity.

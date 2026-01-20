@@ -5,3 +5,7 @@
 ## 2026-01-13 - Rich CLI Feedback
 **Learning:** Standard print statements get lost in the noise. Using structured output (Panels) and visual indicators (spinners, emojis) significantly improves perceived performance and clarity of CLI tools.
 **Action:** Use the `rich` library for all user-facing CLI scripts to provide consistent, accessible, and visually appealing feedback (spinners for blocking ops, panels for context).
+
+## 2026-01-20 - Friendly Error Messages for External Dependencies
+**Learning:** Raw stack traces from external dependencies (like TensorFlow Hub network errors) are intimidating and unhelpful to users.
+**Action:** Wrap external dependency calls (network/IO) in try/except blocks and raise custom exceptions (like `RuntimeError`) with clear, actionable advice (e.g., "Check internet connection").

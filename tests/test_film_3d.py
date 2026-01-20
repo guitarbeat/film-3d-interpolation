@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import tensorflow as tf
 from film_3d import Interpolator3D, max_intensity_projection, load_volume
 
 
@@ -59,6 +60,24 @@ class TestFilm3D(unittest.TestCase):
 
         np.testing.assert_array_equal(mip_complex, expected_complex_mip)
 
+    def test_max_intensity_projection_tensor(self):
+        """Tests max_intensity_projection with TensorFlow tensor input."""
+        test_volume = np.array([
+            [[[[1], [2]], [[3], [4]]]],
+            [[[[5], [6]], [[7], [8]]]]
+        ], dtype=np.float32).reshape(1, 2, 2, 2, 1)
+        test_tensor = tf.convert_to_tensor(test_volume)
+
+        mip_result = max_intensity_projection(test_tensor, axis=1)
+
+        self.assertTrue(tf.is_tensor(mip_result))
+
+        expected_mip = np.array([
+            [[[5], [6]], [[7], [8]]]
+        ], dtype=np.float32).reshape(1, 2, 2, 1)
+
+        np.testing.assert_array_equal(mip_result.numpy(), expected_mip)
+
     def test_interpolator_3d(self):
         """Tests the Interpolator3D class.
 
@@ -76,13 +95,18 @@ class TestFilm3D(unittest.TestCase):
         x1 = np.random.rand(batch_size, depth, height, width, channels).astype(np.float32)
         dt = np.array([0.5], dtype=np.float32)
 
-        result = interpolator(x0, x1, dt)
-
-        # Expected output channels is 3 because FILM model outputs RGB
+        # Test default behavior (return numpy)
+        result_np = interpolator(x0, x1, dt)
         expected_shape = (batch_size, depth, height, width, 3)
-        self.assertEqual(result.shape, expected_shape)
-        self.assertIsInstance(result, np.ndarray)
-        self.assertEqual(result.dtype, np.float32)
+        self.assertEqual(result_np.shape, expected_shape)
+        self.assertIsInstance(result_np, np.ndarray)
+        self.assertEqual(result_np.dtype, np.float32)
+
+        # Test return_tensor=True
+        result_tf = interpolator(x0, x1, dt, return_tensor=True)
+        self.assertEqual(result_tf.shape, expected_shape)
+        self.assertTrue(tf.is_tensor(result_tf))
+        self.assertEqual(result_tf.dtype, tf.float32)
 
 
 if __name__ == '__main__':

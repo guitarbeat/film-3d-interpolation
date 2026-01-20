@@ -96,7 +96,7 @@ if __name__ == '__main__':
     dt = np.array([0.5], dtype=np.float32)
     start_time = time.time()
     with print_status("Interpolating 3D volumes...", spinner="runner"):
-        interpolated_volume = interpolator_3d(volume1, volume2, dt)
+        interpolated_volume = interpolator_3d(volume1, volume2, dt, return_tensor=True)
     elapsed = time.time() - start_time
 
     if HAS_RICH:

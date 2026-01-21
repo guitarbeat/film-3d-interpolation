@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
-from typing import Generator, Iterable, List, Optional
+from typing import Generator, Iterable, List, Optional, Union, Tuple
 
 # This module provides functionalities for 3D frame interpolation using a modified FILM model
 # and for performing Maximum Intensity Projection (MIP) on 3D volumetric data.
@@ -135,7 +135,7 @@ class Interpolator3D:
     inputs = {'x0': x0, 'x1': x1, 'time': time}
     return self._model(inputs, training=False)['image']
 
-  def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray) -> np.ndarray:
+  def __call__(self, x0: np.ndarray, x1: np.ndarray, dt: np.ndarray, return_tensor: bool = False) -> Union[np.ndarray, tf.Tensor]:
     """Generates an interpolated 3D volume between two given 3D volumes.
 
     The interpolation is performed slice by slice using the 2D FILM model.
@@ -148,9 +148,13 @@ class Interpolator3D:
       dt: The sub-frame time, indicating the position of the generated frame
           between x0 and x1. Expected shape: (batch_size,). Values should be
           in the range [0, 1], where 0.5 represents the midway point.
+      return_tensor: If True, returns the output as a TensorFlow Tensor instead of
+                     converting it to a NumPy array. This avoids an implicit
+                     GPU-to-CPU copy (or data conversion) if the result is needed
+                     for further TensorFlow operations. Defaults to False.
 
     Returns:
-      The interpolated 3D volume as a NumPy array with the same dimensions as
+      The interpolated 3D volume as a NumPy array or TensorFlow Tensor with the same dimensions as
       the input volumes: (batch_size, depth, height, width, channels).
     """
     # Input validation for 3D volumes.
@@ -187,6 +191,13 @@ class Interpolator3D:
     if self._align is not None and bbox_to_crop is not None:
         image_batch = tf.image.crop_to_bounding_box(image_batch, **bbox_to_crop)
 
+    if return_tensor:
+        # Reshape back to 5D: (batch*depth, H, W, C) -> (batch, depth, H, W, C)
+        # We rely on TF shape inference here.
+        out_channels = image_batch.shape[-1]
+        interpolated_volume = tf.reshape(image_batch, (batch_size, depth, height, width, out_channels))
+        return interpolated_volume
+
     # Convert result back to numpy
     interpolated_flat = image_batch.numpy()
 
@@ -197,26 +208,27 @@ class Interpolator3D:
 
     return interpolated_volume
 
-def max_intensity_projection(volume: np.ndarray, axis: int = 1) -> np.ndarray:
+def max_intensity_projection(volume: Union[np.ndarray, tf.Tensor], axis: int = 1) -> Union[np.ndarray, tf.Tensor]:
     """Performs Maximum Intensity Projection (MIP) along a specified axis of a 3D volume.
 
     MIP is a method for 3D visualization that projects the voxels with the
     highest intensity onto a 2D plane. This is particularly useful for
-    visualizing structures like 
-
-
-3D sticks in time, as it highlights the brightest parts of the data.
+    visualizing structures like 3D sticks in time, as it highlights the brightest parts of the data.
 
     Args:
-        volume: The input 3D volume as a NumPy array. Expected shape:
+        volume: The input 3D volume as a NumPy array or TensorFlow Tensor. Expected shape:
                 (batch_size, depth, height, width, channels).
         axis: The axis along which to perform the MIP. For a 5D volume,
               axis=1 typically corresponds to the depth (Z-axis) dimension.
 
     Returns:
-        A 2D projection of the volume as a NumPy array, with the specified
+        A 2D projection of the volume as a NumPy array or Tensor, with the specified
         axis collapsed. The shape will be (batch_size, height, width, channels)
         if MIP is performed along the depth axis.
     """
+    if tf.is_tensor(volume):
+        assert len(volume.shape) == 5, "Input volume must be 5D for MIP (batch, depth, height, width, channels)"
+        return tf.reduce_max(volume, axis=axis)
+
     assert np.ndim(volume) == 5, "Input volume must be 5D for MIP (batch, depth, height, width, channels)"
     return np.max(volume, axis=axis)

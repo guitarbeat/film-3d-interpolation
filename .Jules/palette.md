@@ -5,3 +5,7 @@
 ## 2026-01-13 - Rich CLI Feedback
 **Learning:** Standard print statements get lost in the noise. Using structured output (Panels) and visual indicators (spinners, emojis) significantly improves perceived performance and clarity of CLI tools.
 **Action:** Use the `rich` library for all user-facing CLI scripts to provide consistent, accessible, and visually appealing feedback (spinners for blocking ops, panels for context).
+
+## 2026-01-21 - [Improve CLI Data Summary]
+**Learning:** Users often overlook dimension changes (like channel expansion) in tensor operations. Explicitly tabulating input vs. output shapes reduces debugging time.
+**Action:** Use a summary table for CLI scripts to side-by-side compare tensor dimensions and execution metrics.

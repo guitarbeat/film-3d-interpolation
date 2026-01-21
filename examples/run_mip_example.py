@@ -17,6 +17,7 @@ try:
     from rich.console import Console
     from rich.traceback import install
     from rich.panel import Panel
+    from rich.table import Table
     install()
     console = Console()
     HAS_RICH = True
@@ -24,6 +25,27 @@ except ImportError:
     HAS_RICH = False
 
 # UX Helpers
+def print_summary_table(input_shape, output_shape, time_taken, device, out_path):
+    if HAS_RICH:
+        table = Table(title="Execution Summary", box=None)
+        table.add_column("Metric", style="bold cyan")
+        table.add_column("Value")
+
+        table.add_row("Input Shape", str(input_shape))
+        table.add_row("Output Shape", str(output_shape))
+        table.add_row("Inference Time", f"{time_taken:.2f}s")
+        table.add_row("Device", device)
+        table.add_row("Output Path", f"[link=file://{os.path.abspath(out_path)}]{out_path}[/link]")
+
+        console.print(table)
+    else:
+        print("\n=== Execution Summary ===")
+        print(f"Input Shape:    {input_shape}")
+        print(f"Output Shape:   {output_shape}")
+        print(f"Inference Time: {time_taken:.2f}s")
+        print(f"Device:         {device}")
+        print(f"Output Path:    {out_path}")
+
 def print_header(title):
     if HAS_RICH:
         console.print(Panel.fit(f"[bold blue]{title}[/bold blue]", border_style="blue"))
@@ -101,9 +123,8 @@ if __name__ == '__main__':
 
     if HAS_RICH:
         console.print(f"[bold green]✅ Interpolation complete![/bold green] [dim]({elapsed:.2f}s)[/dim]")
-        console.print(f"   [blue]Volume shape:[/blue] {interpolated_volume.shape}")
     else:
-        print(f"✅ Interpolation complete! ({elapsed:.2f}s)\n   Volume shape: {interpolated_volume.shape}")
+        print(f"✅ Interpolation complete! ({elapsed:.2f}s)")
 
     with print_status("Performing Maximum Intensity Projection..."):
         mip_v1 = max_intensity_projection(volume1, axis=1)
@@ -130,7 +151,12 @@ if __name__ == '__main__':
         plt.tight_layout()
         plt.savefig(out_path)
 
-    if HAS_RICH:
-        console.print(f"[bold green]✨ Saved comparison MIP image to:[/bold green] [link=file://{out_path}]{out_path}[/link]")
-    else:
-        print(f"✨ Saved comparison MIP image to: {out_path}")
+    # Display summary
+    device_name = gpus[0].name if (gpus and len(gpus) > 0) else "CPU"
+    print_summary_table(
+        input_shape=volume1.shape,
+        output_shape=interpolated_volume.shape,
+        time_taken=elapsed,
+        device=device_name,
+        out_path=out_path
+    )

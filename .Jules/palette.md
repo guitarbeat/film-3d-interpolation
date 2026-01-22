@@ -5,3 +5,7 @@
 ## 2026-01-13 - Rich CLI Feedback
 **Learning:** Standard print statements get lost in the noise. Using structured output (Panels) and visual indicators (spinners, emojis) significantly improves perceived performance and clarity of CLI tools.
 **Action:** Use the `rich` library for all user-facing CLI scripts to provide consistent, accessible, and visually appealing feedback (spinners for blocking ops, panels for context).
+
+## 2026-01-22 - Graceful Dependency Failure
+**Learning:** Python libraries often expose raw exceptions (like `OSError` or `ValueError`) from internal dependencies (like TensorFlow Hub) to end users, which is confusing and unactionable.
+**Action:** Wrap external dependency calls (e.g., model loading) in `try/except` blocks within the library's `__init__`, raising a custom exception (e.g., `RuntimeError`) with clear, actionable advice while preserving the original traceback.

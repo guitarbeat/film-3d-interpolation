@@ -84,6 +84,53 @@ class TestFilm3D(unittest.TestCase):
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.dtype, np.float32)
 
+    def test_interpolator_3d_return_tensor(self):
+        """Tests the Interpolator3D class with return_tensor=True."""
+        import tensorflow as tf
+        interpolator = Interpolator3D(align=16)
+        batch_size = 1
+        depth = 4
+        height = 64
+        width = 64
+        channels = 1
+
+        x0 = np.random.rand(batch_size, depth, height, width, channels).astype(np.float32)
+        x1 = np.random.rand(batch_size, depth, height, width, channels).astype(np.float32)
+        dt = np.array([0.5], dtype=np.float32)
+
+        result_tensor = interpolator(x0, x1, dt, return_tensor=True)
+
+        self.assertTrue(tf.is_tensor(result_tensor))
+        # Expected output channels is 3 because FILM model outputs RGB
+        expected_shape = (batch_size, depth, height, width, 3)
+        self.assertEqual(result_tensor.shape, expected_shape)
+
+        # Verify values match numpy return (within tolerance)
+        result_numpy = interpolator(x0, x1, dt, return_tensor=False)
+        np.testing.assert_allclose(result_tensor.numpy(), result_numpy, atol=1e-5)
+
+    def test_max_intensity_projection_tensor(self):
+        """Tests max_intensity_projection with Tensor input."""
+        import tensorflow as tf
+
+        # Test case 1: Simple 3D array as Tensor
+        test_volume_np = np.array([
+            [[[[1], [2]], [[3], [4]]]],
+            [[[[5], [6]], [[7], [8]]]]
+        ], dtype=np.float32).reshape(1, 2, 2, 2, 1)
+        test_volume_tensor = tf.convert_to_tensor(test_volume_np)
+
+        # Perform MIP
+        mip_result = max_intensity_projection(test_volume_tensor, axis=1)
+
+        self.assertTrue(tf.is_tensor(mip_result))
+
+        expected_mip = np.array([
+            [[[5], [6]], [[7], [8]]]
+        ], dtype=np.float32).reshape(1, 2, 2, 1)
+
+        np.testing.assert_array_equal(mip_result.numpy(), expected_mip)
+
 
 if __name__ == '__main__':
     unittest.main()

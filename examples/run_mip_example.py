@@ -17,6 +17,7 @@ try:
     from rich.console import Console
     from rich.traceback import install
     from rich.panel import Panel
+    from rich.table import Table
     install()
     console = Console()
     HAS_RICH = True
@@ -101,7 +102,17 @@ if __name__ == '__main__':
 
     if HAS_RICH:
         console.print(f"[bold green]✅ Interpolation complete![/bold green] [dim]({elapsed:.2f}s)[/dim]")
-        console.print(f"   [blue]Volume shape:[/blue] {interpolated_volume.shape}")
+
+        table = Table(title="Interpolation Summary", box=None)
+        table.add_column("Tensor", style="cyan")
+        table.add_column("Shape", style="magenta")
+        table.add_column("Dtype", style="green")
+
+        table.add_row("Input Volume 1", str(volume1.shape), str(volume1.dtype))
+        table.add_row("Input Volume 2", str(volume2.shape), str(volume2.dtype))
+        table.add_row("Output Volume", str(interpolated_volume.shape), str(interpolated_volume.dtype))
+
+        console.print(table)
     else:
         print(f"✅ Interpolation complete! ({elapsed:.2f}s)\n   Volume shape: {interpolated_volume.shape}")
 

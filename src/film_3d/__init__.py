@@ -121,7 +121,12 @@ class Interpolator3D:
              a common requirement for deep learning models.
     """
     # Load the pre-trained 2D FILM model from TensorFlow Hub.
-    self._model = hub.load("https://tfhub.dev/google/film/1")
+    try:
+      self._model = hub.load("https://tfhub.dev/google/film/1")
+    except (OSError, ValueError) as e:
+      raise RuntimeError(
+          "Failed to load FILM model. Please check your internet connection or proxy settings."
+      ) from e
     self._align = align
 
   @tf.function(jit_compile=True)

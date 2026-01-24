@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from film_3d import Interpolator3D, max_intensity_projection, load_volume
+from film_3d import Interpolator3D, max_intensity_projection, load_volume, _pad_to_align
 
 
 class TestFilm3D(unittest.TestCase):
@@ -130,6 +130,50 @@ class TestFilm3D(unittest.TestCase):
         ], dtype=np.float32).reshape(1, 2, 2, 1)
 
         np.testing.assert_array_equal(mip_result.numpy(), expected_mip)
+
+    def test_pad_to_align(self):
+        """Tests the _pad_to_align function for correctness."""
+        import tensorflow as tf
+
+        align = 4
+        # Case 1: 4D input, needs padding
+        # Shape: (1, 2, 2, 1) -> Pad to (1, 4, 4, 1)
+        x_4d = np.ones((1, 2, 2, 1), dtype=np.float32)
+        padded_4d, bbox = _pad_to_align(x_4d, align)
+
+        self.assertEqual(padded_4d.shape, (1, 4, 4, 1))
+        # Verify padding logic: 2 -> 4 requires 2 padding.
+        # offset should be 2//2 = 1.
+        self.assertEqual(bbox['offset_height'], 1)
+        self.assertEqual(bbox['offset_width'], 1)
+        self.assertEqual(bbox['target_height'], 2)
+        self.assertEqual(bbox['target_width'], 2)
+
+        # Case 2: 4D input, already aligned
+        x_4d_aligned = np.ones((1, 4, 4, 1), dtype=np.float32)
+        padded_4d_aligned, bbox_aligned = _pad_to_align(x_4d_aligned, align)
+        self.assertEqual(padded_4d_aligned.shape, (1, 4, 4, 1))
+        self.assertIsNone(bbox_aligned)
+
+        # Case 3: 5D input, needs padding
+        # Shape: (1, 2, 2, 2, 1) -> Pad to (1, 2, 4, 4, 1)
+        x_5d = np.ones((1, 2, 2, 2, 1), dtype=np.float32)
+        padded_5d, bbox_5d = _pad_to_align(x_5d, align)
+
+        self.assertEqual(padded_5d.shape, (1, 2, 4, 4, 1))
+        self.assertEqual(bbox_5d['offset_height'], 1)
+        self.assertEqual(bbox_5d['offset_width'], 1)
+
+        # Verify content logic (padding should be zeros)
+        # Center crop should be ones
+        center_crop = tf.image.crop_to_bounding_box(padded_5d[:, 0, :, :, :], **bbox_5d)
+        np.testing.assert_array_equal(center_crop.numpy(), np.ones((1, 2, 2, 1)))
+
+        # Case 4: 5D input, already aligned
+        x_5d_aligned = np.ones((1, 2, 4, 4, 1), dtype=np.float32)
+        padded_5d_aligned, bbox_5d_aligned = _pad_to_align(x_5d_aligned, align)
+        self.assertEqual(padded_5d_aligned.shape, (1, 2, 4, 4, 1))
+        self.assertIsNone(bbox_5d_aligned)
 
 
 if __name__ == '__main__':

@@ -187,7 +187,7 @@ class Interpolator3D:
     # Prepare time input. dt is (batch_size,). We need it to be (batch_size * depth, 1).
     # First, repeat each element 'depth' times.
     # dt: [t1, t2] -> [t1, t1, ..., t2, t2, ...]
-    dt_repeated = np.repeat(dt, depth)
+    dt_repeated = tf.repeat(dt, depth)
     dt_reshaped = dt_repeated[..., np.newaxis] # (batch*depth, 1)
 
     # Perform inference using the 2D FILM model on the entire batch.

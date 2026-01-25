@@ -34,8 +34,18 @@ def print_header(title):
 def print_status(msg, spinner="dots"):
     if HAS_RICH:
         return console.status(f"[bold]{msg}[/bold]", spinner=spinner)
-    print(msg, flush=True)
-    return contextlib.nullcontext()
+
+    @contextlib.contextmanager
+    def simple_status():
+        print(msg, end=" ", flush=True)
+        try:
+            yield
+            print("Done.")
+        except:
+            print("Failed.")
+            raise
+
+    return simple_status()
 
 def print_success(msg):
     if HAS_RICH:

@@ -77,21 +77,16 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]
       'target_width': width + width_to_pad
   }
 
-  # Apply padding to each 2D slice of the volume independently.
-  padded_x_slices = []
-  for d in range(depth):
-      if np.ndim(x) == 5:
-          # Extract a 2D slice from the 5D volume and pad it.
-          padded_x_slices.append(tf.image.pad_to_bounding_box(x[:, d, :, :, :], **bbox_to_pad))
-      else:
-          # If 4D, pad the entire image batch.
-          padded_x_slices.append(tf.image.pad_to_bounding_box(x, **bbox_to_pad))
-
-  # Stack the padded slices back into the original dimension format.
+  # Apply padding to the input.
   if np.ndim(x) == 5:
-      padded_x = tf.stack(padded_x_slices, axis=1) # Stack back into 5D volume.
+      # Optimize for 5D: Reshape to 4D to process all slices in parallel using efficient TF ops
+      # instead of a slow Python loop.
+      x_reshaped = tf.reshape(x, (batch_size * depth, height, width, channels))
+      padded_x_reshaped = tf.image.pad_to_bounding_box(x_reshaped, **bbox_to_pad)
+      padded_x = tf.reshape(padded_x_reshaped, (batch_size, depth, height + height_to_pad, width + width_to_pad, channels))
   else:
-      padded_x = padded_x_slices[0] # Remains 4D image batch.
+      # 4D case: Pad the image batch directly.
+      padded_x = tf.image.pad_to_bounding_box(x, **bbox_to_pad)
 
   # Define the bounding box for cropping back to original dimensions after inference.
   bbox_to_crop = {

@@ -5,3 +5,7 @@
 ## 2026-01-19 - [XLA Compilation Overhead on CPU]
 **Learning:** Enabling XLA (`jit_compile=True`) for the FILM model on CPU introduced a significant startup latency (~3s overhead) due to compilation, while only offering negligible improvements for subsequent steady-state inference.
 **Action:** For CLI tools or applications with short lifecycles running on CPU, disable JIT compilation (`jit_compile=False`) to prioritize faster startup and immediate responsiveness.
+
+## 2026-01-25 - [Graph Execution Compatibility]
+**Learning:** Using `np.repeat` on a Tensor forces an implicit conversion to NumPy, which raises `NotImplementedError` when attempting to trace the function with `@tf.function` (graph execution).
+**Action:** Use `tf.repeat` instead of `np.repeat` when working with potential Tensors. `tf.repeat` is compatible with both Tensors and NumPy arrays (converting them to Tensors), ensuring the operation remains graph-compatible.

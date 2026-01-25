@@ -50,9 +50,10 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]
                     to revert the padding.
   """
   # Input validation: ensure the input array has 4 or 5 dimensions.
-  assert np.ndim(x) == 4 or np.ndim(x) == 5, \
-      "Input must be 4D (batch, H, W, C) or 5D (batch, D, H, W, C)"
-  assert align > 0, "Alignment value must be a positive number."
+  if not (np.ndim(x) == 4 or np.ndim(x) == 5):
+      raise ValueError("Input must be 4D (batch, H, W, C) or 5D (batch, D, H, W, C)")
+  if align <= 0:
+      raise ValueError("Alignment value must be a positive number.")
 
   # Determine dimensions based on whether it's a 4D image batch or 5D volume.
   if np.ndim(x) == 5:
@@ -165,9 +166,10 @@ class Interpolator3D:
       with the same dimensions as the input volumes: (batch_size, depth, height, width, channels).
     """
     # Input validation for 3D volumes.
-    assert np.ndim(x0) == 5 and np.ndim(x1) == 5, \
-        "Input volumes must be 5D (batch, depth, height, width, channels)"
-    assert x0.shape[1] == x1.shape[1], "Input volumes must have the same depth dimension."
+    if not (np.ndim(x0) == 5 and np.ndim(x1) == 5):
+        raise ValueError("Input volumes must be 5D (batch, depth, height, width, channels)")
+    if x0.shape[1] != x1.shape[1]:
+        raise ValueError("Input volumes must have the same depth dimension.")
 
     batch_size, depth, height, width, channels = x0.shape
 
@@ -240,5 +242,6 @@ def max_intensity_projection(volume: np.ndarray, axis: int = 1) -> np.ndarray:
     if tf.is_tensor(volume):
         return tf.reduce_max(volume, axis=axis)
 
-    assert np.ndim(volume) == 5, "Input volume must be 5D for MIP (batch, depth, height, width, channels)"
+    if np.ndim(volume) != 5:
+        raise ValueError("Input volume must be 5D for MIP (batch, depth, height, width, channels)")
     return np.max(volume, axis=axis)

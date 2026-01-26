@@ -29,6 +29,33 @@ def load_volume(vol_path: str) -> np.ndarray:
   dummy_volume = np.random.rand(10, 128, 128, 1).astype(np.float32)
   return dummy_volume
 
+def _calculate_padding_bbox(height: int, width: int, align: int) -> tuple[Optional[dict], Optional[dict]]:
+  """Calculates padding and cropping bounding boxes based on alignment."""
+  # Calculate padding needed for height and width.
+  height_to_pad = (align - height % align) if height % align != 0 else 0
+  width_to_pad = (align - width % align) if width % align != 0 else 0
+
+  if height_to_pad == 0 and width_to_pad == 0:
+      return None, None
+
+  # Define the bounding box for padding.
+  bbox_to_pad = {
+      'offset_height': height_to_pad // 2,
+      'offset_width': width_to_pad // 2,
+      'target_height': height + height_to_pad,
+      'target_width': width + width_to_pad
+  }
+
+  # Define the bounding box for cropping back to original dimensions.
+  bbox_to_crop = {
+      'offset_height': height_to_pad // 2,
+      'offset_width': width_to_pad // 2,
+      'target_height': height,
+      'target_width': width
+  }
+  return bbox_to_pad, bbox_to_crop
+
+
 def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]:
   """Pads an image batch or 3D volume so its height and width are divisible by 'align'.
 
@@ -63,20 +90,10 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]
       batch_size, height, width, channels = x.shape
       depth = 1
 
-  # Calculate padding needed for height and width.
-  height_to_pad = (align - height % align) if height % align != 0 else 0
-  width_to_pad = (align - width % align) if width % align != 0 else 0
+  bbox_to_pad, bbox_to_crop = _calculate_padding_bbox(height, width, align)
 
-  if height_to_pad == 0 and width_to_pad == 0:
+  if bbox_to_pad is None:
       return tf.convert_to_tensor(x), None
-
-  # Define the bounding box for padding.
-  bbox_to_pad = {
-      'offset_height': height_to_pad // 2,
-      'offset_width': width_to_pad // 2,
-      'target_height': height + height_to_pad,
-      'target_width': width + width_to_pad
-  }
 
   # Apply padding to the input.
   if np.ndim(x) == 5:
@@ -84,18 +101,11 @@ def _pad_to_align(x: np.ndarray, align: int) -> tuple[tf.Tensor, Optional[dict]]
       # instead of a slow Python loop.
       x_reshaped = tf.reshape(x, (batch_size * depth, height, width, channels))
       padded_x_reshaped = tf.image.pad_to_bounding_box(x_reshaped, **bbox_to_pad)
-      padded_x = tf.reshape(padded_x_reshaped, (batch_size, depth, height + height_to_pad, width + width_to_pad, channels))
+      padded_x = tf.reshape(padded_x_reshaped, (batch_size, depth, bbox_to_pad['target_height'], bbox_to_pad['target_width'], channels))
   else:
       # 4D case: Pad the image batch directly.
       padded_x = tf.image.pad_to_bounding_box(x, **bbox_to_pad)
 
-  # Define the bounding box for cropping back to original dimensions after inference.
-  bbox_to_crop = {
-      'offset_height': height_to_pad // 2,
-      'offset_width': width_to_pad // 2,
-      'target_height': height,
-      'target_width': width
-  }
   return padded_x, bbox_to_crop
 
 
@@ -180,11 +190,22 @@ class Interpolator3D:
     # Apply padding if alignment is required.
     # _pad_to_align handles 4D input by padding the whole batch at once.
     if self._align is not None:
-        slice0_padded, bbox_to_crop = _pad_to_align(x0_reshaped, self._align)
-        slice1_padded, _ = _pad_to_align(x1_reshaped, self._align)
+        batch_depth, height, width, _ = x0_reshaped.shape
+        bbox_to_pad, bbox_to_crop = _calculate_padding_bbox(height, width, self._align)
+
+        if bbox_to_pad is not None:
+            slice0_padded = tf.image.pad_to_bounding_box(x0_reshaped, **bbox_to_pad)
+            # Re-use calculated padding params for x1 to avoid redundant overhead
+            slice1_padded = tf.image.pad_to_bounding_box(x1_reshaped, **bbox_to_pad)
+        else:
+            # Explicitly convert to Tensor if aligned to ensure type consistency with _pad_to_align behavior
+            slice0_padded = tf.convert_to_tensor(x0_reshaped)
+            slice1_padded = tf.convert_to_tensor(x1_reshaped)
+            bbox_to_crop = None
     else:
         slice0_padded = x0_reshaped
         slice1_padded = x1_reshaped
+        bbox_to_crop = None
 
     # Prepare time input. dt is (batch_size,). We need it to be (batch_size * depth, 1).
     # First, repeat each element 'depth' times.

@@ -13,3 +13,7 @@
 ## 2026-01-25 - Robust Status Fallbacks
 **Learning:** When `rich` is missing, simple print statements ("Loading...") leave users unsure if a process has finished or hung.
 **Action:** Implement a lightweight context manager for non-`rich` environments that appends "Done." or "Failed." upon completion, ensuring the user always receives closure for blocking operations.
+
+## 2026-02-03 - Scientific Data Summaries
+**Learning:** Users working with normalized scientific data (e.g., [0, 1] range) need immediate validation of value ranges and data types in CLI outputs to catch subtle errors (like overflow or incorrect scaling) without opening external tools.
+**Action:** Enhance data summary tables to include `dtype` and `Range (Min/Max)` columns, alongside shape information, for all tensor/array outputs.

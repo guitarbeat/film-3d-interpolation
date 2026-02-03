@@ -59,21 +59,23 @@ def print_error(msg):
     else:
         print(f"❌ {msg}")
 
-def print_summary(v1_shape, v2_shape, interp_shape):
+def print_summary(v1, v2, interp):
     if HAS_RICH:
-        table = Table(title="Data Summary", box=None)
+        table = Table(title="Data Summary", box=None, caption="Dimensions: [Batch, Depth, Height, Width, Channels]")
         table.add_column("Dataset", style="cyan", no_wrap=True)
         table.add_column("Shape", style="magenta")
-        table.add_row("Input Volume 1", str(v1_shape))
-        table.add_row("Input Volume 2", str(v2_shape))
-        table.add_row("Interpolated", str(interp_shape))
+        table.add_column("Dtype", style="green")
+        table.add_column("Range (Min / Max)", style="yellow")
+
+        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+            table.add_row(name, str(data.shape), str(data.dtype), f"{data.min():.2f} / {data.max():.2f}")
         console.print(table)
         console.print()
     else:
-        print("\n📊 Data Summary:")
-        print(f"   • Input Volume 1: {v1_shape}")
-        print(f"   • Input Volume 2: {v2_shape}")
-        print(f"   • Interpolated:   {interp_shape}\n")
+        print("\n📊 Data Summary (Dimensions: [Batch, Depth, Height, Width, Channels]):")
+        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+            print(f"   • {name:<16} Shape: {str(data.shape):<20} Dtype: {str(data.dtype):<10} Range: {data.min():.2f} / {data.max():.2f}")
+        print()
 
 def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:
     """Creates dummy 3D volumetric data containing simple 'sticks'."""
@@ -131,7 +133,7 @@ if __name__ == '__main__':
     else:
         print(f"✅ Interpolation complete! ({elapsed:.2f}s)")
 
-    print_summary(volume1.shape, volume2.shape, interpolated_volume.shape)
+    print_summary(volume1, volume2, interpolated_volume)
 
     with print_status("Performing Maximum Intensity Projection..."):
         mip_v1 = max_intensity_projection(volume1, axis=1)

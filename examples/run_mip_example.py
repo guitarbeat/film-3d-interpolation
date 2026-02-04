@@ -76,6 +76,16 @@ def print_summary(v1, v2, interp):
         table.add_column("Dataset", style="cyan", no_wrap=True)
         table.add_column("Shape", style="magenta")
         table.add_column("Dtype", style="green")
+        table.add_column("Range (Min / Max)", style="yellow")
+
+        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+            table.add_row(name, str(data.shape), str(data.dtype), f"{data.min():.2f} / {data.max():.2f}")
+        console.print(table)
+        console.print()
+    else:
+        print("\n📊 Data Summary (Dimensions: [Batch, Depth, Height, Width, Channels]):")
+        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+            print(f"   • {name:<16} Shape: {str(data.shape):<20} Dtype: {str(data.dtype):<10} Range: {data.min():.2f} / {data.max():.2f}")
         table.add_column("Range", style="yellow")
 
         for name, arr in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:

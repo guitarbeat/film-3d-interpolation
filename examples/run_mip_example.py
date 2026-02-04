@@ -59,21 +59,37 @@ def print_error(msg):
     else:
         print(f"❌ {msg}")
 
-def print_summary(v1_shape, v2_shape, interp_shape):
+def print_summary(v1, v2, interp):
+    def get_info(arr):
+        if tf.is_tensor(arr):
+            val_min = float(tf.reduce_min(arr))
+            val_max = float(tf.reduce_max(arr))
+            dtype = arr.dtype.name
+        else:
+            val_min = float(np.min(arr))
+            val_max = float(np.max(arr))
+            dtype = arr.dtype.name
+        return str(arr.shape), dtype, f"[{val_min:.2f}, {val_max:.2f}]"
+
     if HAS_RICH:
         table = Table(title="Data Summary", box=None)
         table.add_column("Dataset", style="cyan", no_wrap=True)
         table.add_column("Shape", style="magenta")
-        table.add_row("Input Volume 1", str(v1_shape))
-        table.add_row("Input Volume 2", str(v2_shape))
-        table.add_row("Interpolated", str(interp_shape))
+        table.add_column("Dtype", style="green")
+        table.add_column("Range", style="yellow")
+
+        for name, arr in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+             shape, dtype, val_range = get_info(arr)
+             table.add_row(name, shape, dtype, val_range)
+
         console.print(table)
         console.print()
     else:
         print("\n📊 Data Summary:")
-        print(f"   • Input Volume 1: {v1_shape}")
-        print(f"   • Input Volume 2: {v2_shape}")
-        print(f"   • Interpolated:   {interp_shape}\n")
+        for name, arr in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+             shape, dtype, val_range = get_info(arr)
+             print(f"   • {name:<15} Shape: {shape:<20} Dtype: {dtype:<8} Range: {val_range}")
+        print()
 
 def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:
     """Creates dummy 3D volumetric data containing simple 'sticks'."""
@@ -108,21 +124,21 @@ if __name__ == '__main__':
         print(f"🚀 Running on GPU: {gpus[0].name}" if gpus else "🐢 Running on CPU (Performance might be slower)")
 
     try:
-        with print_status("[1/3] Loading FILM model..."):
+        with print_status("[1/4] Loading FILM model..."):
             interpolator_3d = Interpolator3D()
         print_success("FILM model loaded successfully!")
     except Exception as e:
         print_error(f"Error loading FILM model: {e}")
         exit(1)
 
-    with print_status("[2/3] Creating dummy 3D data..."):
+    with print_status("[2/4] Creating dummy 3D data..."):
         volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), seed=1234)
         volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), seed=5678)
     print_success("Dummy data created.")
 
     dt = np.array([0.5], dtype=np.float32)
     start_time = time.time()
-    with print_status("[3/3] Interpolating 3D volumes...", spinner="runner"):
+    with print_status("[3/4] Interpolating 3D volumes...", spinner="runner"):
         interpolated_volume = interpolator_3d(volume1, volume2, dt)
     elapsed = time.time() - start_time
 
@@ -131,9 +147,9 @@ if __name__ == '__main__':
     else:
         print(f"✅ Interpolation complete! ({elapsed:.2f}s)")
 
-    print_summary(volume1.shape, volume2.shape, interpolated_volume.shape)
+    print_summary(volume1, volume2, interpolated_volume)
 
-    with print_status("Performing Maximum Intensity Projection..."):
+    with print_status("[4/4] Performing Maximum Intensity Projection..."):
         mip_v1 = max_intensity_projection(volume1, axis=1)
         mip_interp = max_intensity_projection(interpolated_volume, axis=1)
         mip_v2 = max_intensity_projection(volume2, axis=1)

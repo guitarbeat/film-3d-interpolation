@@ -72,7 +72,7 @@ def print_summary(v1, v2, interp):
         return str(arr.shape), dtype, f"[{val_min:.2f}, {val_max:.2f}]"
 
     if HAS_RICH:
-        table = Table(title="Data Summary", box=None)
+        table = Table(title="Data Summary", box=None, caption="Dimensions: [Batch, Depth, Height, Width, Channels]")
         table.add_column("Dataset", style="cyan", no_wrap=True)
         table.add_column("Shape", style="magenta")
         table.add_column("Dtype", style="green")
@@ -89,6 +89,21 @@ def print_summary(v1, v2, interp):
         for name, arr in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
              shape, dtype, val_range = get_info(arr)
              print(f"   • {name:<15} Shape: {shape:<20} Dtype: {dtype:<8} Range: {val_range}")
+        table.add_column("Min/Max", style="yellow")
+
+        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+            table.add_row(
+                name,
+                str(data.shape),
+                str(data.dtype),
+                f"{np.min(data):.2f} / {np.max(data):.2f}"
+            )
+        console.print(table)
+        console.print()
+    else:
+        print("\n📊 Data Summary (B, D, H, W, C):")
+        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
+            print(f"   • {name:<15}: Shape={data.shape}, Dtype={data.dtype}, Range=[{np.min(data):.2f}, {np.max(data):.2f}]")
         print()
 
 def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:

@@ -20,3 +20,7 @@
 ## 2026-01-26 - Data Transparency in CLI Summaries
 **Learning:** In scientific workflows, verifying tensor shapes is insufficient; silent type conversions or normalization issues (e.g., float vs uint8 ranges) are common pitfalls.
 **Action:** Enhance CLI data summaries to include `dtype` and `min/max` range statistics alongside shapes, giving users immediate confidence in data integrity.
+
+## 2026-02-05 - Fallback Verification
+**Learning:** Optional dependencies (like `rich`) can mask syntax errors in fallback code paths if those paths are not actively exercised during development.
+**Action:** When implementing optional UX enhancements, explicitly test the "missing dependency" path (e.g., by temporarily disabling the import) to ensure basic functionality remains intact.

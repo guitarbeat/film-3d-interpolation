@@ -69,7 +69,7 @@ def print_summary(v1, v2, interp):
             val_min = float(np.min(arr))
             val_max = float(np.max(arr))
             dtype = arr.dtype.name
-        return str(arr.shape), dtype, f"[{val_min:.2f}, {val_max:.2f}]"
+        return str(arr.shape), dtype, val_min, val_max
 
     if HAS_RICH:
         table = Table(title="Data Summary", box=None, caption="Dimensions: [Batch, Depth, Height, Width, Channels]")
@@ -79,41 +79,17 @@ def print_summary(v1, v2, interp):
         table.add_column("Range (Min / Max)", style="yellow")
 
         for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
-            table.add_row(name, str(data.shape), str(data.dtype), f"{data.min():.2f} / {data.max():.2f}")
+            shape, dtype, v_min, v_max = get_info(data)
+            table.add_row(name, shape, dtype, f"{v_min:.2f} / {v_max:.2f}")
         console.print(table)
         console.print()
     else:
         print("\n📊 Data Summary (Dimensions: [Batch, Depth, Height, Width, Channels]):")
+        print(f"   {'Dataset':<20} {'Shape':<25} {'Dtype':<10} {'Range (Min / Max)':<20}")
+        print(f"   {'-'*20} {'-'*25} {'-'*10} {'-'*20}")
         for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
-            print(f"   • {name:<16} Shape: {str(data.shape):<20} Dtype: {str(data.dtype):<10} Range: {data.min():.2f} / {data.max():.2f}")
-        table.add_column("Range", style="yellow")
-
-        for name, arr in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
-             shape, dtype, val_range = get_info(arr)
-             table.add_row(name, shape, dtype, val_range)
-
-        console.print(table)
-        console.print()
-    else:
-        print("\n📊 Data Summary:")
-        for name, arr in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
-             shape, dtype, val_range = get_info(arr)
-             print(f"   • {name:<15} Shape: {shape:<20} Dtype: {dtype:<8} Range: {val_range}")
-        table.add_column("Min/Max", style="yellow")
-
-        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
-            table.add_row(
-                name,
-                str(data.shape),
-                str(data.dtype),
-                f"{np.min(data):.2f} / {np.max(data):.2f}"
-            )
-        console.print(table)
-        console.print()
-    else:
-        print("\n📊 Data Summary (B, D, H, W, C):")
-        for name, data in [("Input Volume 1", v1), ("Input Volume 2", v2), ("Interpolated", interp)]:
-            print(f"   • {name:<15}: Shape={data.shape}, Dtype={data.dtype}, Range=[{np.min(data):.2f}, {np.max(data):.2f}]")
+            shape, dtype, v_min, v_max = get_info(data)
+            print(f"   {name:<20} {shape:<25} {dtype:<10} {v_min:.2f} / {v_max:.2f}")
         print()
 
 def create_dummy_3d_data(shape: tuple = (1, 10, 64, 64, 1), num_sticks: int = 5, stick_length: int = 5, seed: int = 1234) -> np.ndarray:

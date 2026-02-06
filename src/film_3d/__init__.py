@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
+from functools import lru_cache
 from typing import Generator, Iterable, List, Optional
 
 # This module provides functionalities for 3D frame interpolation using a modified FILM model
@@ -29,11 +30,15 @@ def load_volume(vol_path: str) -> np.ndarray:
   dummy_volume = np.random.rand(10, 128, 128, 1).astype(np.float32)
   return dummy_volume
 
+@lru_cache(maxsize=128)
 def _calculate_padding_bbox(height: int, width: int, align: int) -> tuple[Optional[dict], Optional[dict]]:
   """Calculates padding and cropping bounding boxes based on alignment."""
   # Calculate padding needed for height and width.
-  height_to_pad = (align - height % align) if height % align != 0 else 0
-  width_to_pad = (align - width % align) if width % align != 0 else 0
+  h_rem = height % align
+  w_rem = width % align
+
+  height_to_pad = (align - h_rem) if h_rem != 0 else 0
+  width_to_pad = (align - w_rem) if w_rem != 0 else 0
 
   if height_to_pad == 0 and width_to_pad == 0:
       return None, None

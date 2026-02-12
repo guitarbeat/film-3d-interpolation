@@ -20,3 +20,7 @@
 ## 2026-01-26 - Data Transparency in CLI Summaries
 **Learning:** In scientific workflows, verifying tensor shapes is insufficient; silent type conversions or normalization issues (e.g., float vs uint8 ranges) are common pitfalls.
 **Action:** Enhance CLI data summaries to include `dtype` and `min/max` range statistics alongside shapes, giving users immediate confidence in data integrity.
+
+## 2026-02-12 - Persistent Completion Messages in CLI
+**Learning:** Users lose context in multi-step CLI processes when transient status messages (spinners) disappear without a permanent completion record, creating a disjointed log.
+**Action:** Design status context managers to automatically append a persistent "Success" message upon completion, ensuring a linear and complete history of execution steps.

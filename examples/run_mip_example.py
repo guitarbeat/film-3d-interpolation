@@ -147,10 +147,14 @@ if __name__ == '__main__':
         interpolated_volume = interpolator_3d(volume1, volume2, dt)
     elapsed = time.time() - start_time
 
+    # Calculate performance metrics
+    total_frames = volume1.shape[0] * volume1.shape[1] # batch * depth
+    time_per_frame = (elapsed / total_frames) * 1000 # ms
+
     if HAS_RICH:
-        console.print(f"[bold green]✅ Interpolation complete![/bold green] [dim]({elapsed:.2f}s)[/dim]")
+        console.print(f"[bold green]✅ Interpolation complete![/bold green] [dim]({elapsed:.2f}s, {time_per_frame:.1f} ms/frame)[/dim]")
     else:
-        print(f"✅ Interpolation complete! ({elapsed:.2f}s)")
+        print(f"✅ Interpolation complete! ({elapsed:.2f}s, {time_per_frame:.1f} ms/frame)")
 
     print_summary(volume1, volume2, interpolated_volume)
 
@@ -162,6 +166,7 @@ if __name__ == '__main__':
         out_dir = os.path.join(os.path.dirname(__file__), 'outputs')
         os.makedirs(out_dir, exist_ok=True)
         out_path = os.path.join(out_dir, 'interpolated_mip_comparison.png')
+        out_path = os.path.abspath(out_path)
 
         plt.figure(figsize=(15, 5))
         plt.subplot(1, 3, 1)

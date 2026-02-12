@@ -31,21 +31,25 @@ def print_header(title):
     else:
         print(f"\n=== {title} ===\n")
 
-def print_status(msg, spinner="dots"):
+@contextlib.contextmanager
+def print_status(msg, spinner="dots", success_msg=None):
     if HAS_RICH:
-        return console.status(f"[bold]{msg}[/bold]", spinner=spinner)
-
-    @contextlib.contextmanager
-    def simple_status():
+        with console.status(f"[bold]{msg}[/bold]", spinner=spinner):
+            yield
+        if success_msg:
+            console.print(f"[bold green]✅ {success_msg}[/bold green]")
+    else:
         print(msg, end=" ", flush=True)
         try:
             yield
-            print("Done.")
+            if success_msg:
+                print("Done.")
+                print(f"✅ {success_msg}")
+            else:
+                print("Done.")
         except:
             print("Failed.")
             raise
-
-    return simple_status()
 
 def print_success(msg):
     if HAS_RICH:
@@ -127,17 +131,15 @@ if __name__ == '__main__':
         print(f"🚀 Running on GPU: {gpus[0].name}" if gpus else "🐢 Running on CPU (Performance might be slower)")
 
     try:
-        with print_status("[1/4] Loading FILM model..."):
+        with print_status("[1/4] Loading FILM model...", success_msg="FILM model loaded successfully!"):
             interpolator_3d = Interpolator3D()
-        print_success("FILM model loaded successfully!")
     except Exception as e:
         print_error(f"Error loading FILM model: {e}")
         exit(1)
 
-    with print_status("[2/4] Creating dummy 3D data..."):
+    with print_status("[2/4] Creating dummy 3D data...", success_msg="Dummy data created."):
         volume1 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), seed=1234)
         volume2 = create_dummy_3d_data(shape=(1, 10, 64, 64, 1), seed=5678)
-    print_success("Dummy data created.")
 
     dt = np.array([0.5], dtype=np.float32)
     start_time = time.time()
@@ -152,7 +154,7 @@ if __name__ == '__main__':
 
     print_summary(volume1, volume2, interpolated_volume)
 
-    with print_status("[4/4] Performing Maximum Intensity Projection..."):
+    with print_status("[4/4] Performing Maximum Intensity Projection...", success_msg="MIP complete!"):
         mip_v1 = max_intensity_projection(volume1, axis=1)
         mip_interp = max_intensity_projection(interpolated_volume, axis=1)
         mip_v2 = max_intensity_projection(volume2, axis=1)
